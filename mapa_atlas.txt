@@ -1,0 +1,53 @@
+# =============================================================================
+# SIEG-Atlas — Mapa de Fuentes V1.0
+# Formato: MODULO | URL | CF (0.0-1.0) | TIPO | DESCRIPCION
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# PETROLEO & GAS
+# ---------------------------------------------------------------------------
+Petroleo | https://feeds.reuters.com/reuters/businessNews | 0.9 | RSS | Reuters Business
+Petroleo | https://oilprice.com/rss/main | 0.7 | RSS | OilPrice General
+Petroleo | https://feeds.bbci.co.uk/news/business/rss.xml | 0.9 | RSS | BBC Business
+Petroleo | https://www.eia.gov/rss/todayinenergy.xml | 1.0 | RSS | EIA Today in Energy
+
+# ---------------------------------------------------------------------------
+# RUTAS MARITIMAS
+# ---------------------------------------------------------------------------
+Maritimo | https://feeds.bbci.co.uk/news/world/rss.xml | 0.9 | RSS | BBC World
+Maritimo | https://www.maritime-executive.com/rss | 0.8 | RSS | Maritime Executive
+Maritimo | https://splash247.com/feed/ | 0.7 | RSS | Splash247 Shipping
+Maritimo | https://www.lloydslist.com/rss | 0.8 | RSS | Lloyds List
+
+# ---------------------------------------------------------------------------
+# CABLES SUBMARINOS
+# ---------------------------------------------------------------------------
+Cables | https://feeds.bbci.co.uk/news/technology/rss.xml | 0.9 | RSS | BBC Tech
+Cables | https://www.theregister.com/internet/networks/headlines.atom | 0.8 | RSS | The Register Networks
+Cables | https://www.lightreading.com/rss | 0.7 | RSS | Light Reading Telecom
+Cables | https://ripe.net/publications/news/feed/ | 1.0 | RSS | RIPE NCC
+
+# ---------------------------------------------------------------------------
+# MAR DE CHINA
+# ---------------------------------------------------------------------------
+MarChina | https://amti.csis.org/feed/ | 1.0 | RSS | AMTI CSIS Asia Maritime
+MarChina | https://feeds.bbci.co.uk/news/world/asia/rss.xml | 0.9 | RSS | BBC Asia
+MarChina | https://thediplomat.com/feed/ | 0.8 | RSS | The Diplomat
+MarChina | https://rss.nytimes.com/services/xml/rss/nyt/AsiaPacific.xml | 0.9 | RSS | NYT Asia Pacific
+
+# ---------------------------------------------------------------------------
+# ESPACIO
+# ---------------------------------------------------------------------------
+Espacio | https://spacenews.com/feed/ | 0.9 | RSS | SpaceNews
+Espacio | https://www.nasa.gov/rss/dyn/breaking_news.rss | 1.0 | RSS | NASA Breaking News
+Espacio | https://www.esa.int/rssfeed/Our_Activities/Space_Safety | 0.9 | RSS | ESA Space Safety
+Espacio | https://feeds.bbci.co.uk/news/science_and_environment/rss.xml | 0.9 | RSS | BBC Science
+
+# ---------------------------------------------------------------------------
+# CIBERGEOPOLITICA
+# ---------------------------------------------------------------------------
+Ciber | https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.xml | 1.0 | RSS | CISA KEV
+Ciber | https://www.enisa.europa.eu/media/rss/news.rss | 0.9 | RSS | ENISA News
+Ciber | https://feeds.feedburner.com/TheHackersNews | 0.8 | RSS | The Hacker News
+Ciber | https://krebsonsecurity.com/feed/ | 0.9 | RSS | Krebs on Security
+Ciber | https://isc.sans.edu/rssfeed_full.xml | 1.0 | RSS | SANS Internet Storm Center
