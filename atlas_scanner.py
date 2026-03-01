@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-SIEG-Atlas Scanner V1.1
-Fixes vs V1.0:
-  - Vocabulario ampliado: Houthi, Mar Rojo, Hormuz, tanker, drone ship
-  - Suelos reajustados: Maritimo 45, Petroleo 35 (conflicto activo)
-  - Aliases de region para capturar menciones indirectas
-  - Fuentes muertas reemplazadas
-  - Reuters DNS fix: reemplazado por feeds alternativos
+SIEG-Atlas Scanner V1.2 — Autolearning de Fuentes
+Novedades vs V1.1:
+  - Sistema de 3 capas: primarias -> banco alternativas -> Google News RSS
+  - Indicador de calidad por modulo: VERDE/AZUL/AMARILLO/NARANJA/ROJO
+  - Criterio minimo: 40 noticias procesadas por modulo
+  - Fallback automatico hasta alcanzar el minimo
+  - Calidad guardada en JSON y mostrada en terminal
 """
 
 import json
@@ -23,15 +23,17 @@ import xml.etree.ElementTree as ET
 # CONFIGURACION
 # ---------------------------------------------------------------------------
 
-BASE_DIR     = Path(__file__).resolve().parent
-DATA_LIVE    = BASE_DIR / "data" / "live"
-DATA_STATIC  = BASE_DIR / "data" / "static"
-MAPA_FUENTES = BASE_DIR / "mapa_atlas.txt"
-HISTORY_CSV  = DATA_LIVE / "history_atlas.csv"
+BASE_DIR      = Path(__file__).resolve().parent
+DATA_LIVE     = BASE_DIR / "data" / "live"
+DATA_STATIC   = BASE_DIR / "data" / "static"
+MAPA_FUENTES  = BASE_DIR / "mapa_atlas.txt"
+HISTORY_CSV   = DATA_LIVE / "history_atlas.csv"
+LEARNED_FILE  = DATA_LIVE / "atlas_learned_sources.json"
 
-RSS_ITEMS    = 20
-TIMEOUT_HTTP = 12
-VERSION      = "V1.1"
+RSS_ITEMS     = 20
+TIMEOUT_HTTP  = 12
+VERSION       = "V1.2"
+MIN_NOTICIAS  = 40     # Umbral minimo aceptable de noticias por modulo
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,7 +43,107 @@ logging.basicConfig(
 log = logging.getLogger("ATLAS")
 
 # ---------------------------------------------------------------------------
-# VOCABULARIO POR EJE — V1.1 ampliado
+# INDICADOR DE CALIDAD
+# Verde:    >= 60 noticias  (cobertura optima)
+# Azul:     >= 40 noticias  (cobertura aceptable — minimo)
+# Amarillo: >= 25 noticias  (cobertura reducida)
+# Naranja:  >= 10 noticias  (cobertura critica)
+# Rojo:      < 10 noticias  (sin cobertura — solo suelo base)
+# ---------------------------------------------------------------------------
+
+def calcular_calidad(n_noticias: int, n_fuentes_activas: int,
+                     uso_fallback: bool, uso_web: bool) -> dict:
+    if n_noticias >= 60:
+        nivel, emoji, css = "VERDE",    "🟢", "green"
+    elif n_noticias >= 40:
+        nivel, emoji, css = "AZUL",     "🔵", "blue"
+    elif n_noticias >= 25:
+        nivel, emoji, css = "AMARILLO", "🟡", "yellow"
+    elif n_noticias >= 10:
+        nivel, emoji, css = "NARANJA",  "🟠", "orange"
+    else:
+        nivel, emoji, css = "ROJO",     "🔴", "red"
+
+    return {
+        "nivel":            nivel,
+        "emoji":            emoji,
+        "css":              css,
+        "noticias":         n_noticias,
+        "fuentes_activas":  n_fuentes_activas,
+        "uso_fallback":     uso_fallback,
+        "uso_web":          uso_web,
+    }
+
+# ---------------------------------------------------------------------------
+# BANCO DE FUENTES ALTERNATIVAS (CAPA 2)
+# Fuentes de respaldo por modulo — activadas si primarias insuficientes
+# ---------------------------------------------------------------------------
+
+FALLBACK_SOURCES = {
+    "Petroleo": [
+        {"url": "https://www.ft.com/rss/home/uk",                          "cf": 0.9},
+        {"url": "https://www.wsj.com/xml/rss/3_7085.xml",                  "cf": 0.9},
+        {"url": "https://feeds.skynews.com/feeds/rss/business.xml",        "cf": 0.8},
+        {"url": "https://www.cnbc.com/id/10001147/device/rss/rss.html",    "cf": 0.8},
+        {"url": "https://feeds.feedburner.com/PetroleumEconomist",         "cf": 0.9},
+    ],
+    "Maritimo": [
+        {"url": "https://www.navalnews.com/feed/",                         "cf": 0.9},
+        {"url": "https://www.maritimebulletin.net/feed/",                  "cf": 0.8},
+        {"url": "https://feeds.skynews.com/feeds/rss/world.xml",           "cf": 0.8},
+        {"url": "https://www.defensenews.com/rss/",                        "cf": 0.8},
+        {"url": "https://www.janes.com/feeds/news",                        "cf": 0.9},
+    ],
+    "Cables": [
+        {"url": "https://feeds.arstechnica.com/arstechnica/index",         "cf": 0.8},
+        {"url": "https://www.zdnet.com/news/rss.xml",                      "cf": 0.8},
+        {"url": "https://feeds.skynews.com/feeds/rss/technology.xml",      "cf": 0.8},
+        {"url": "https://www.computerweekly.com/rss",                      "cf": 0.7},
+        {"url": "https://www.networkworld.com/index.rss",                  "cf": 0.7},
+    ],
+    "MarChina": [
+        {"url": "https://feeds.skynews.com/feeds/rss/world.xml",           "cf": 0.8},
+        {"url": "https://www.defensenews.com/rss/",                        "cf": 0.8},
+        {"url": "https://foreignpolicy.com/feed/",                         "cf": 0.9},
+        {"url": "https://www.scmp.com/rss/91/feed",                        "cf": 0.7},
+        {"url": "https://asia.nikkei.com/rss/feed/nar",                    "cf": 0.8},
+    ],
+    "Espacio": [
+        {"url": "https://www.spaceflightnow.com/feed/",                    "cf": 0.9},
+        {"url": "https://feeds.skynews.com/feeds/rss/science.xml",         "cf": 0.8},
+        {"url": "https://phys.org/rss-feed/space-news/",                   "cf": 0.8},
+        {"url": "https://www.universetoday.com/feed/",                     "cf": 0.7},
+        {"url": "https://astronomy.com/rss/news",                          "cf": 0.7},
+    ],
+    "Ciber": [
+        {"url": "https://www.securityweek.com/feed/",                      "cf": 0.9},
+        {"url": "https://www.helpnetsecurity.com/feed/",                   "cf": 0.8},
+        {"url": "https://feeds.skynews.com/feeds/rss/technology.xml",      "cf": 0.8},
+        {"url": "https://www.infosecurity-magazine.com/rss/news/",         "cf": 0.8},
+        {"url": "https://www.cyberscoop.com/feed/",                        "cf": 0.9},
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# CAPA 3: GOOGLE NEWS RSS (ultimo recurso)
+# Genera URL de busqueda RSS por terminos clave del modulo
+# ---------------------------------------------------------------------------
+
+GOOGLE_NEWS_QUERIES = {
+    "Petroleo":  "oil+gas+opec+energy+petroleum",
+    "Maritimo":  "maritime+shipping+houthi+red+sea+hormuz",
+    "Cables":    "submarine+cable+internet+infrastructure",
+    "MarChina":  "south+china+sea+taiwan+strait+naval",
+    "Espacio":   "satellite+space+launch+military+orbit",
+    "Ciber":     "cyberattack+hacking+ransomware+apt",
+}
+
+def build_google_news_url(modulo: str) -> str:
+    query = GOOGLE_NEWS_QUERIES.get(modulo, modulo.lower())
+    return f"https://news.google.com/rss/search?q={query}&hl=en&gl=US&ceid=US:en"
+
+# ---------------------------------------------------------------------------
+# VOCABULARIO (heredado de V1.1)
 # ---------------------------------------------------------------------------
 
 KEYWORDS = {
@@ -69,7 +171,6 @@ KEYWORDS = {
         "alto":  [
             "ship seized", "vessel attacked", "naval incident", "strait closed",
             "piracy attack", "mine detected", "warship blocked", "maritime clash",
-            # FIX: vocabulario Houthi/Mar Rojo activo
             "houthi attack", "houthi missile", "houthi drone", "red sea attack",
             "tanker hit", "cargo ship attacked", "vessel struck", "ship fire",
             "naval blockade", "shipping blocked", "hormuz closure",
@@ -82,31 +183,26 @@ KEYWORDS = {
             "houthi", "red sea", "yemen attack", "naval warning",
             "shipping disruption", "maritime alert", "vessel diverted",
             "tanker rerouted", "gulf of aden", "persian gulf tension",
-            "naval patrol", "warship deployment",
         ],
         "bajo": [
             "shipping", "maritime", "vessel", "cargo", "freight",
-            "port", "navigation", "sea route", "naval", "coast guard",
-            "shipping cost", "freight rates", "maritime security",
+            "port", "navigation", "sea route", "naval",
         ],
     },
     "Cables": {
         "alto":  [
             "cable cut", "submarine cable severed", "cable sabotage",
             "undersea cable damaged", "internet outage", "fiber cut",
-            "cable attack", "subsea sabotage", "internet disruption",
-            "cable ship attacked", "network infrastructure attack",
+            "cable attack", "subsea sabotage", "network infrastructure attack",
         ],
         "medio": [
             "submarine cable", "undersea fiber", "internet infrastructure",
             "cable ship", "cable repair", "network disruption", "outage",
             "fiber optic cut", "cable fault", "internet blackout",
-            "connectivity loss", "cable maintenance", "network outage",
         ],
         "bajo": [
-            "telecommunications", "bandwidth", "latency", "network",
-            "fiber optic", "connectivity", "data center", "internet",
-            "submarine", "cable system",
+            "telecommunications", "bandwidth", "network",
+            "fiber optic", "connectivity", "data center",
         ],
     },
     "MarChina": {
@@ -115,37 +211,33 @@ KEYWORDS = {
             "taiwan strait incident", "island seized", "naval standoff",
             "coast guard confrontation", "military drills taiwan",
             "china invasion", "taiwan blockade", "pla exercise",
-            "naval confrontation", "chinese coast guard weapon",
             "water cannon", "laser attack", "ship collision china",
         ],
         "medio": [
             "south china sea", "taiwan strait", "nine dash line",
-            "spratly", "paracel", "fiery cross", "militarization",
+            "spratly", "paracel", "militarization",
             "freedom of navigation", "fonop", "taiwan independence",
             "china military", "pla", "philippines sea dispute",
-            "vietnam china", "indo-pacific tension",
         ],
         "bajo": [
-            "china sea", "taiwan", "philippines sea", "vietnam sea",
-            "indo-pacific", "quad", "aukus", "asean", "china navy",
+            "china sea", "taiwan", "philippines sea",
+            "indo-pacific", "quad", "aukus", "asean",
         ],
     },
     "Espacio": {
         "alto":  [
             "satellite destroyed", "anti-satellite", "asat test",
             "space collision", "debris field", "orbital weapon",
-            "space attack", "jamming satellite", "satellite blinded",
-            "orbital bombardment", "space weapon deployed",
+            "space attack", "jamming satellite",
         ],
         "medio": [
             "rocket launch", "missile launch", "military satellite",
-            "space force", "lunar mission", "starlink", "spy satellite",
-            "orbital debris", "space race", "hypersonic", "icbm test",
-            "reentry vehicle", "maneuver satellite",
+            "space force", "starlink", "spy satellite",
+            "orbital debris", "space race", "hypersonic",
         ],
         "bajo": [
-            "satellite", "launch", "orbit", "spacecraft", "nasa",
-            "esa", "roscosmos", "cnsa", "space station", "iss",
+            "satellite", "launch", "orbit", "spacecraft",
+            "nasa", "esa", "roscosmos", "cnsa",
         ],
     },
     "Ciber": {
@@ -154,58 +246,43 @@ KEYWORDS = {
             "state-sponsored attack", "cyberwarfare", "ransomware attack",
             "zero-day exploited", "apt attack", "election interference",
             "water treatment hack", "hospital ransomware", "pipeline hack",
-            "nuclear facility cyber", "military network breach",
         ],
         "medio": [
             "cyber attack", "data breach", "hacking", "malware",
-            "phishing campaign", "vulnerability", "exploit", "cisa alert",
-            "enisa warning", "apt group", "nation state hacker",
-            "cyber espionage", "supply chain attack", "ddos attack",
+            "phishing campaign", "vulnerability", "exploit",
+            "apt group", "nation state hacker", "cyber espionage",
         ],
         "bajo": [
             "cybersecurity", "cyber", "hack", "security breach",
             "intrusion", "threat actor", "patch", "cve",
-            "vulnerability disclosure", "security advisory",
         ],
     },
 }
 
-# Desescalada
 DEESCALATION = [
     "resolved", "agreement", "ceasefire", "diplomatic", "normalized",
-    "restored", "peace", "cooperation", "joint statement", "de-escalation",
+    "restored", "peace", "cooperation", "joint statement",
 ]
 
-# ---------------------------------------------------------------------------
-# FIX: SUELOS REAJUSTADOS
-# Maritimo sube a 45 — Houthi activo, Mar Rojo bloqueado
-# Petroleo sube a 35 — impacto energetico del conflicto
-# MarChina sube a 42 — tension Taiwan/Filipinas sostenida
-# Ciber sube a 33   — actividad APT elevada
-# ---------------------------------------------------------------------------
 SUELOS = {
-    "Petroleo": 35,   # sube — impacto energetico conflicto Iran/Israel
-    "Maritimo": 45,   # sube — Houthi activo, Mar Rojo disruption
+    "Petroleo": 35,
+    "Maritimo": 45,
     "Cables":   15,
-    "MarChina": 42,   # sube — tension estructural sostenida
+    "MarChina": 42,
     "Espacio":  20,
-    "Ciber":    33,   # sube — APT elevado
+    "Ciber":    33,
 }
 
-# ---------------------------------------------------------------------------
-# ALIASES POR MODULO
-# Captura menciones indirectas en titulares RSS
-# ---------------------------------------------------------------------------
 ALIASES = {
     "Petroleo": ["oil", "gas", "energy", "opec", "brent", "crude",
                  "petroleum", "fuel", "lng", "pipeline", "refinery"],
     "Maritimo": ["ship", "vessel", "tanker", "houthi", "red sea",
                  "hormuz", "suez", "naval", "maritime", "strait",
-                 "cargo", "shipping", "port", "coast guard"],
+                 "cargo", "shipping", "port"],
     "Cables":   ["cable", "fiber", "internet", "network", "submarine",
                  "undersea", "telecom", "connectivity"],
     "MarChina": ["china", "taiwan", "philippines", "south china",
-                 "pla", "beijing", "taiwan strait", "spratly"],
+                 "pla", "beijing", "spratly"],
     "Espacio":  ["satellite", "rocket", "launch", "orbit", "space",
                  "missile", "debris", "starlink", "asat"],
     "Ciber":    ["cyber", "hack", "malware", "ransomware", "apt",
@@ -213,7 +290,29 @@ ALIASES = {
 }
 
 # ---------------------------------------------------------------------------
-# CARGA DE FUENTES
+# CARGA Y GUARDADO DE FUENTES APRENDIDAS
+# ---------------------------------------------------------------------------
+
+def cargar_fuentes_aprendidas() -> dict:
+    """Carga el historial de fuentes descubiertas en ciclos anteriores."""
+    if not LEARNED_FILE.exists():
+        return {}
+    try:
+        with open(LEARNED_FILE) as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def guardar_fuentes_aprendidas(aprendidas: dict) -> None:
+    try:
+        with open(LEARNED_FILE, "w") as f:
+            json.dump(aprendidas, f, indent=2)
+    except OSError as e:
+        log.warning("No se pudo guardar fuentes aprendidas: %s", e)
+
+# ---------------------------------------------------------------------------
+# CARGA DE FUENTES PRIMARIAS
 # ---------------------------------------------------------------------------
 
 def cargar_fuentes() -> dict:
@@ -234,15 +333,128 @@ def cargar_fuentes() -> dict:
                     log.warning("Linea mal formada: %s", linea.strip())
     return fuentes
 
+# ---------------------------------------------------------------------------
+# FETCH RSS — con contador de fuentes activas
+# ---------------------------------------------------------------------------
+
+def fetch_rss(fuentes_lista: list, modulo: str,
+              label: str = "primaria") -> tuple:
+    """
+    Descarga RSS. Retorna (noticias, n_fuentes_activas).
+    label: 'primaria' | 'fallback' | 'web'
+    """
+    headers  = {"User-Agent": "Mozilla/5.0 (compatible; SIEG-Atlas/1.2)"}
+    noticias = []
+    activas  = 0
+
+    for fuente in fuentes_lista:
+        try:
+            r = requests.get(fuente["url"], headers=headers,
+                             timeout=TIMEOUT_HTTP)
+            r.raise_for_status()
+            root  = ET.fromstring(r.content)
+            items = root.findall(".//item")[:RSS_ITEMS]
+            if items:
+                activas += 1
+            for item in items:
+                title_el    = item.find("title")
+                desc_el     = item.find("description")
+                title       = (title_el.text or "") if title_el is not None else ""
+                desc        = (desc_el.text  or "") if desc_el  is not None else ""
+                desc_limpio = re.sub(r"<[^>]+>", " ", desc)
+                noticias.append({
+                    "text": f"{title} {desc_limpio}",
+                    "cf":   fuente["cf"],
+                })
+        except requests.RequestException as e:
+            if label == "primaria":
+                log.warning("%s | [%s] Fuente no disponible: %s",
+                            modulo, label, e)
+        except ET.ParseError as e:
+            if label == "primaria":
+                log.warning("%s | [%s] RSS malformado: %s",
+                            modulo, label, e)
+
+    return noticias, activas
+
 
 # ---------------------------------------------------------------------------
-# SCORING V1.1 — con aliases
+# SISTEMA DE 3 CAPAS — autolearning
+# ---------------------------------------------------------------------------
+
+def fetch_con_autolearning(modulo: str,
+                           fuentes_primarias: list,
+                           aprendidas: dict) -> tuple:
+    """
+    Intenta alcanzar MIN_NOTICIAS usando 3 capas:
+      1. Fuentes primarias (mapa_atlas.txt)
+      2. Banco de alternativas (FALLBACK_SOURCES)
+      3. Google News RSS (busqueda por keywords)
+
+    Retorna (noticias, calidad_dict, aprendidas_actualizadas)
+    """
+    uso_fallback = False
+    uso_web      = False
+
+    # --- CAPA 1: Primarias ---
+    noticias, activas = fetch_rss(fuentes_primarias, modulo, "primaria")
+    log.info("%s | Capa 1 (primarias): %d noticias / %d fuentes activas",
+             modulo, len(noticias), activas)
+
+    # --- CAPA 2: Fallback si insuficiente ---
+    if len(noticias) < MIN_NOTICIAS:
+        uso_fallback = True
+        fallbacks = FALLBACK_SOURCES.get(modulo, [])
+
+        # Incluir fuentes aprendidas en ciclos anteriores
+        fuentes_aprendidas_modulo = [
+            {"url": u, "cf": 0.7}
+            for u in aprendidas.get(modulo, [])
+        ]
+        todas_fallback = fallbacks + fuentes_aprendidas_modulo
+
+        n2, a2 = fetch_rss(todas_fallback, modulo, "fallback")
+        noticias += n2
+        activas  += a2
+        log.info("%s | Capa 2 (fallback): +%d noticias | Total: %d",
+                 modulo, len(n2), len(noticias))
+
+    # --- CAPA 3: Google News RSS si sigue insuficiente ---
+    if len(noticias) < MIN_NOTICIAS:
+        uso_web = True
+        google_url = build_google_news_url(modulo)
+        try:
+            n3, a3 = fetch_rss(
+                [{"url": google_url, "cf": 0.6}],
+                modulo, "web"
+            )
+            noticias += n3
+            activas  += a3
+            log.info("%s | Capa 3 (Google News): +%d noticias | Total: %d",
+                     modulo, len(n3), len(noticias))
+
+            # Guardar URL de Google News como fuente aprendida si aportó noticias
+            if n3:
+                if modulo not in aprendidas:
+                    aprendidas[modulo] = []
+                if google_url not in aprendidas[modulo]:
+                    aprendidas[modulo].append(google_url)
+                    log.info("%s | Nueva fuente aprendida: %s",
+                             modulo, google_url)
+        except Exception as e:
+            log.warning("%s | Capa 3 fallida: %s", modulo, e)
+
+    calidad = calcular_calidad(len(noticias), activas, uso_fallback, uso_web)
+    return noticias, calidad, aprendidas
+
+
+# ---------------------------------------------------------------------------
+# SCORING
 # ---------------------------------------------------------------------------
 
 def _score_texto(texto: str, modulo: str) -> float:
     t = texto.lower()
 
-    # Desescalada
     deesc = sum(1 for w in DEESCALATION if w in t)
     if deesc >= 2:
         return 12.0
@@ -257,7 +469,6 @@ def _score_texto(texto: str, modulo: str) -> float:
 
     score = (hits_alto * 25) + (hits_medio * 12) + (hits_bajo * 4)
 
-    # Bonus si alias del modulo presente en el texto
     aliases = ALIASES.get(modulo, [])
     if any(a in t for a in aliases):
         score *= 1.25
@@ -271,7 +482,6 @@ def _score_texto(texto: str, modulo: str) -> float:
 def calcular_score_modulo(noticias: list, modulo: str,
                           old_score: float) -> tuple:
     if not noticias:
-        log.warning("%s: Sin noticias.", modulo)
         return int(old_score), []
 
     scores_pond, pesos, alertas = [], [], []
@@ -314,17 +524,25 @@ def cargar_old_score(modulo: str) -> float:
 
 
 def guardar_resultado(modulo: str, score: int, alertas: list,
-                      n_noticias: int, ts: float) -> None:
+                      n_noticias: int, ts: float,
+                      calidad: dict) -> None:
     path = DATA_LIVE / f"atlas_{modulo.lower()}.json"
     try:
         with open(path, "w") as f:
             json.dump({
-                "modulo":    modulo,
-                "score":     score,
-                "alertas":   alertas,
-                "noticias":  n_noticias,
-                "timestamp": ts,
-                "version":   VERSION,
+                "modulo":           modulo,
+                "score":            score,
+                "alertas":          alertas,
+                "noticias":         n_noticias,
+                "timestamp":        ts,
+                "version":          VERSION,
+                # NUEVO: indicador de calidad de fuentes
+                "calidad_nivel":    calidad["nivel"],
+                "calidad_emoji":    calidad["emoji"],
+                "calidad_css":      calidad["css"],
+                "fuentes_activas":  calidad["fuentes_activas"],
+                "uso_fallback":     calidad["uso_fallback"],
+                "uso_web":          calidad["uso_web"],
             }, f, indent=2, ensure_ascii=False)
     except OSError as e:
         log.error("%s | No se pudo guardar: %s", modulo, e)
@@ -339,38 +557,6 @@ def guardar_historico(modulo: str, score: int, ts: float) -> None:
 
 
 # ---------------------------------------------------------------------------
-# FETCH RSS
-# ---------------------------------------------------------------------------
-
-def fetch_rss(fuentes: list, modulo: str) -> list:
-    headers  = {"User-Agent": "Mozilla/5.0 (compatible; SIEG-Atlas/1.1)"}
-    noticias = []
-
-    for fuente in fuentes:
-        try:
-            r = requests.get(fuente["url"], headers=headers,
-                             timeout=TIMEOUT_HTTP)
-            r.raise_for_status()
-            root = ET.fromstring(r.content)
-            for item in root.findall(".//item")[:RSS_ITEMS]:
-                title_el    = item.find("title")
-                desc_el     = item.find("description")
-                title       = (title_el.text or "") if title_el is not None else ""
-                desc        = (desc_el.text  or "") if desc_el  is not None else ""
-                desc_limpio = re.sub(r"<[^>]+>", " ", desc)
-                noticias.append({
-                    "text": f"{title} {desc_limpio}",
-                    "cf":   fuente["cf"],
-                })
-        except requests.RequestException as e:
-            log.warning("%s | Fuente no disponible: %s", modulo, e)
-        except ET.ParseError as e:
-            log.warning("%s | RSS malformado: %s", modulo, e)
-
-    return noticias
-
-
-# ---------------------------------------------------------------------------
 # SCAN PRINCIPAL
 # ---------------------------------------------------------------------------
 
@@ -378,7 +564,9 @@ def scan() -> None:
     DATA_LIVE.mkdir(parents=True, exist_ok=True)
     DATA_STATIC.mkdir(parents=True, exist_ok=True)
 
-    fuentes = cargar_fuentes()
+    fuentes    = cargar_fuentes()
+    aprendidas = cargar_fuentes_aprendidas()
+
     if not fuentes:
         log.error("Sin fuentes configuradas. Abortando.")
         return
@@ -386,35 +574,53 @@ def scan() -> None:
     ts = time.time()
     print(f"--- S.I.E.G. ATLAS SCANNER {VERSION} | "
           f"{datetime.now().strftime('%H:%M:%S')} ---")
+    print(f"    Umbral minimo: {MIN_NOTICIAS} noticias | "
+          f"Capas: primarias -> fallback -> Google News")
+    print()
 
     resultados = {}
 
     for modulo, data_fuentes in fuentes.items():
-        old_score      = cargar_old_score(modulo)
-        noticias       = fetch_rss(data_fuentes, modulo)
+        old_score = cargar_old_score(modulo)
+
+        # Sistema de 3 capas
+        noticias, calidad, aprendidas = fetch_con_autolearning(
+            modulo, data_fuentes, aprendidas
+        )
+
         score, alertas = calcular_score_modulo(noticias, modulo, old_score)
 
-        guardar_resultado(modulo, score, alertas, len(noticias), ts)
+        guardar_resultado(modulo, score, alertas, len(noticias), ts, calidad)
         guardar_historico(modulo, score, ts)
         resultados[modulo] = score
 
         delta     = score - int(old_score)
         delta_str = f"+{delta}" if delta > 0 else str(delta)
 
-        icono = ("🚨" if score >= 70 else
-                 "⚠️ " if score >= 45 else "✅")
-        print(f"[{icono}] {modulo:12} | Score: {score:3}% ({delta_str:>4}) | "
-              f"Fuentes: {len(noticias):3} | Alertas: {len(alertas)}")
+        # Output con indicador de calidad
+        icono_score = ("🚨" if score >= 70 else
+                       "⚠️ " if score >= 45 else "✅")
+        fallback_str = " [FB]" if calidad["uso_fallback"] else ""
+        web_str      = " [WEB]" if calidad["uso_web"]      else ""
+
+        print(f"[{icono_score}] {modulo:12} | "
+              f"Score: {score:3}% ({delta_str:>4}) | "
+              f"Noticias: {len(noticias):3} | "
+              f"Calidad: {calidad['emoji']} {calidad['nivel']}"
+              f"{fallback_str}{web_str}")
 
         for a in alertas:
             print(f"       ↳ {a[:100]}")
 
+    # Guardar fuentes aprendidas para proximos ciclos
+    guardar_fuentes_aprendidas(aprendidas)
+
     if resultados:
         avg     = sum(resultados.values()) // len(resultados)
         top_mod = max(resultados, key=resultados.get)
+        print()
         print(f"--- Atlas completado: {len(resultados)} modulos | "
-              f"Avg: {avg}% | Modulo critico: {top_mod} "
-              f"({resultados[top_mod]}%) ---")
+              f"Avg: {avg}% | Critico: {top_mod} ({resultados[top_mod]}%) ---")
 
         try:
             with open(DATA_LIVE / "atlas_global.json", "w") as f:

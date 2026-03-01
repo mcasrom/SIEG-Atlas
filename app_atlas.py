@@ -119,6 +119,16 @@ h1, h2, h3 { color: #00ccff !important; font-family: 'Share Tech Mono', monospac
     border-radius: 6px; padding: 12px; margin-bottom: 8px;
     font-family: monospace;
 }
+.quality-badge {
+    display: inline-block; font-family: monospace;
+    font-size: 0.72em; padding: 2px 8px; border-radius: 10px;
+    margin-top: 3px; letter-spacing: 0.08em;
+}
+.quality-green  { background: #0a2a0a; color: #00ff41; border: 1px solid #00ff41; }
+.quality-blue   { background: #0a1a2a; color: #00ccff; border: 1px solid #00ccff; }
+.quality-yellow { background: #2a2a00; color: #ffdd00; border: 1px solid #ffdd00; }
+.quality-orange { background: #2a1a00; color: #ff8800; border: 1px solid #ff8800; }
+.quality-red    { background: #2a0000; color: #ff2222; border: 1px solid #ff2222; }
 </style>
 """
 
@@ -164,7 +174,10 @@ def load_modulo(modulo: str) -> dict:
             return json.load(f)
     except (OSError, json.JSONDecodeError):
         return {"modulo": modulo, "score": 0, "alertas": [],
-                "noticias": 0, "timestamp": 0, "version": "?"}
+                "noticias": 0, "timestamp": 0, "version": "?",
+                "calidad_nivel": "ROJO", "calidad_emoji": "🔴",
+                "calidad_css": "red", "fuentes_activas": 0,
+                "uso_fallback": False, "uso_web": False}
 
 
 @st.cache_data(ttl=180)
@@ -173,12 +186,18 @@ def load_all_modulos() -> list:
     for m in MODULOS:
         d = load_modulo(m)
         result.append({
-            "key":       m,
-            "display":   MODULO_DISPLAY.get(m, m),
-            "score":     float(d.get("score", 0)),
-            "alertas":   d.get("alertas", []),
-            "noticias":  int(d.get("noticias", 0)),
-            "timestamp": float(d.get("timestamp", 0)),
+            "key":             m,
+            "display":         MODULO_DISPLAY.get(m, m),
+            "score":           float(d.get("score", 0)),
+            "alertas":         d.get("alertas", []),
+            "noticias":        int(d.get("noticias", 0)),
+            "timestamp":       float(d.get("timestamp", 0)),
+            "calidad_nivel":   d.get("calidad_nivel", "ROJO"),
+            "calidad_emoji":   d.get("calidad_emoji", "🔴"),
+            "calidad_css":     d.get("calidad_css", "red"),
+            "fuentes_activas": int(d.get("fuentes_activas", 0)),
+            "uso_fallback":    bool(d.get("uso_fallback", False)),
+            "uso_web":         bool(d.get("uso_web", False)),
         })
     return sorted(result, key=lambda x: x["score"], reverse=True)
 
@@ -629,8 +648,9 @@ def main() -> None:
             "Modulo":    m["display"],
             "Score %":   int(m["score"]),
             "Nivel":     score_label_atlas(m["score"]),
+            "Calidad":   f"{m.get('calidad_emoji','🔴')} {m.get('calidad_nivel','ROJO')}",
             "Alertas":   len(m["alertas"]),
-            "Fuentes":   m["noticias"],
+            "Noticias":  m["noticias"],
         } for m in modulos]
         st.dataframe(
             pd.DataFrame(rows),
