@@ -1,14 +1,14 @@
 {
   "scores": {
-    "Petroleo": 25,
-    "Maritimo": 20,
+    "Petroleo": 35,
+    "Maritimo": 45,
     "Cables": 15,
-    "MarChina": 40,
+    "MarChina": 42,
     "Espacio": 20,
-    "Ciber": 30
+    "Ciber": 33
   },
-  "avg": 25,
-  "top": "MarChina",
-  "timestamp": 1772400883.6998997,
-  "version": "V1.0"
+  "avg": 31,
+  "top": "Maritimo",
+  "timestamp": 1772401902.6165643,
+  "version": "V1.1"
 }

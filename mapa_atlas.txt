@@ -1,53 +1,61 @@
 # =============================================================================
-# SIEG-Atlas — Mapa de Fuentes V1.0
-# Formato: MODULO | URL | CF (0.0-1.0) | TIPO | DESCRIPCION
+# SIEG-Atlas — Mapa de Fuentes V2.1
+# Verificado: 2026-03-01 — URLs muertas eliminadas
 # =============================================================================
 
 # ---------------------------------------------------------------------------
 # PETROLEO & GAS
 # ---------------------------------------------------------------------------
-Petroleo | https://feeds.reuters.com/reuters/businessNews | 0.9 | RSS | Reuters Business
-Petroleo | https://oilprice.com/rss/main | 0.7 | RSS | OilPrice General
-Petroleo | https://feeds.bbci.co.uk/news/business/rss.xml | 0.9 | RSS | BBC Business
-Petroleo | https://www.eia.gov/rss/todayinenergy.xml | 1.0 | RSS | EIA Today in Energy
+Petroleo | https://feeds.bbci.co.uk/news/business/rss.xml              | 0.9 | RSS | BBC Business
+Petroleo | https://www.eia.gov/rss/todayinenergy.xml                    | 1.0 | RSS | EIA Energy
+Petroleo | https://oilprice.com/rss/main                                | 0.8 | RSS | OilPrice
+Petroleo | https://rss.nytimes.com/services/xml/rss/nyt/Business.xml    | 0.9 | RSS | NYT Business
+Petroleo | https://www.aljazeera.com/xml/rss/all.xml                    | 0.7 | RSS | Al Jazeera
+Petroleo | https://feeds.bbci.co.uk/news/world/middle_east/rss.xml      | 0.9 | RSS | BBC Middle East
 
 # ---------------------------------------------------------------------------
 # RUTAS MARITIMAS
 # ---------------------------------------------------------------------------
-Maritimo | https://feeds.bbci.co.uk/news/world/rss.xml | 0.9 | RSS | BBC World
-Maritimo | https://www.maritime-executive.com/rss | 0.8 | RSS | Maritime Executive
-Maritimo | https://splash247.com/feed/ | 0.7 | RSS | Splash247 Shipping
-Maritimo | https://www.lloydslist.com/rss | 0.8 | RSS | Lloyds List
+Maritimo | https://feeds.bbci.co.uk/news/world/rss.xml                 | 0.9 | RSS | BBC World
+Maritimo | https://gcaptain.com/feed/                                   | 0.9 | RSS | gCaptain
+Maritimo | https://splash247.com/feed/                                  | 0.7 | RSS | Splash247
+Maritimo | https://www.aljazeera.com/xml/rss/all.xml                    | 0.7 | RSS | Al Jazeera
+Maritimo | https://feeds.bbci.co.uk/news/world/middle_east/rss.xml      | 0.9 | RSS | BBC Middle East
+Maritimo | https://rss.nytimes.com/services/xml/rss/nyt/World.xml       | 0.9 | RSS | NYT World
 
 # ---------------------------------------------------------------------------
 # CABLES SUBMARINOS
 # ---------------------------------------------------------------------------
-Cables | https://feeds.bbci.co.uk/news/technology/rss.xml | 0.9 | RSS | BBC Tech
-Cables | https://www.theregister.com/internet/networks/headlines.atom | 0.8 | RSS | The Register Networks
-Cables | https://www.lightreading.com/rss | 0.7 | RSS | Light Reading Telecom
-Cables | https://ripe.net/publications/news/feed/ | 1.0 | RSS | RIPE NCC
+Cables | https://feeds.bbci.co.uk/news/technology/rss.xml              | 0.9 | RSS | BBC Tech
+Cables | https://feeds.arstechnica.com/arstechnica/index                | 0.8 | RSS | Ars Technica
+Cables | https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml    | 0.9 | RSS | NYT Tech
+Cables | https://www.theregister.com/headlines.atom                     | 0.8 | RSS | The Register
+Cables | https://www.bleepingcomputer.com/feed/                         | 0.8 | RSS | BleepingComputer
 
 # ---------------------------------------------------------------------------
 # MAR DE CHINA
 # ---------------------------------------------------------------------------
-MarChina | https://amti.csis.org/feed/ | 1.0 | RSS | AMTI CSIS Asia Maritime
-MarChina | https://feeds.bbci.co.uk/news/world/asia/rss.xml | 0.9 | RSS | BBC Asia
-MarChina | https://thediplomat.com/feed/ | 0.8 | RSS | The Diplomat
-MarChina | https://rss.nytimes.com/services/xml/rss/nyt/AsiaPacific.xml | 0.9 | RSS | NYT Asia Pacific
+MarChina | https://amti.csis.org/feed/                                  | 1.0 | RSS | AMTI CSIS
+MarChina | https://feeds.bbci.co.uk/news/world/asia/rss.xml             | 0.9 | RSS | BBC Asia
+MarChina | https://thediplomat.com/feed/                                | 0.8 | RSS | The Diplomat
+MarChina | https://rss.nytimes.com/services/xml/rss/nyt/AsiaPacific.xml | 0.9 | RSS | NYT Asia
+MarChina | https://www.aljazeera.com/xml/rss/all.xml                    | 0.7 | RSS | Al Jazeera
 
 # ---------------------------------------------------------------------------
 # ESPACIO
 # ---------------------------------------------------------------------------
-Espacio | https://spacenews.com/feed/ | 0.9 | RSS | SpaceNews
-Espacio | https://www.nasa.gov/rss/dyn/breaking_news.rss | 1.0 | RSS | NASA Breaking News
-Espacio | https://www.esa.int/rssfeed/Our_Activities/Space_Safety | 0.9 | RSS | ESA Space Safety
+Espacio | https://spacenews.com/feed/                                   | 0.9 | RSS | SpaceNews
+Espacio | https://www.nasa.gov/rss/dyn/breaking_news.rss                | 1.0 | RSS | NASA
 Espacio | https://feeds.bbci.co.uk/news/science_and_environment/rss.xml | 0.9 | RSS | BBC Science
+Espacio | https://www.space.com/feeds/all                               | 0.8 | RSS | Space.com
+Espacio | https://rss.nytimes.com/services/xml/rss/nyt/Science.xml      | 0.9 | RSS | NYT Science
 
 # ---------------------------------------------------------------------------
 # CIBERGEOPOLITICA
 # ---------------------------------------------------------------------------
-Ciber | https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.xml | 1.0 | RSS | CISA KEV
-Ciber | https://www.enisa.europa.eu/media/rss/news.rss | 0.9 | RSS | ENISA News
-Ciber | https://feeds.feedburner.com/TheHackersNews | 0.8 | RSS | The Hacker News
-Ciber | https://krebsonsecurity.com/feed/ | 0.9 | RSS | Krebs on Security
-Ciber | https://isc.sans.edu/rssfeed_full.xml | 1.0 | RSS | SANS Internet Storm Center
+Ciber | https://feeds.feedburner.com/TheHackersNews                     | 0.8 | RSS | The Hacker News
+Ciber | https://krebsonsecurity.com/feed/                               | 0.9 | RSS | Krebs Security
+Ciber | https://isc.sans.edu/rssfeed_full.xml                           | 1.0 | RSS | SANS ISC
+Ciber | https://feeds.bbci.co.uk/news/technology/rss.xml                | 0.9 | RSS | BBC Tech
+Ciber | https://www.bleepingcomputer.com/feed/                          | 0.8 | RSS | BleepingComputer
+Ciber | https://www.darkreading.com/rss.xml                             | 0.8 | RSS | Dark Reading
