@@ -729,11 +729,16 @@ def main() -> None:
         sel_mod = next(m for m in modulos if m["display"] == sel)
         render_module_detail(sel_mod, df_history)
 
-    st.divider()
-    st.caption(
-        f"S.I.E.G. ATLAS {APP_VERSION} · "
-        f"Infraestructura Critica Global · {BUILD_DATE}"
-    )
+    st.markdown(f"""
+    <div class='sieg-footer'>
+        \U0001f30e S.I.E.G. ATLAS {APP_VERSION} &nbsp;&middot;&nbsp;
+        Infraestructura Critica Global &nbsp;&middot;&nbsp;
+        Scanner V1.2 autolearning<br>
+        &copy; {BUILD_DATE} <b>M. Castillo</b> &nbsp;&middot;&nbsp;
+        <a href='mailto:mybloggingnotes@gmail.com'>mybloggingnotes@gmail.com</a>
+        &nbsp;&middot;&nbsp; Nodo: Odroid-C2 / DietPi
+    </div>
+    """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
