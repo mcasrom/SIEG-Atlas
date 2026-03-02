@@ -620,7 +620,7 @@ def main() -> None:
             )
         st.divider()
         st.markdown("**Proyecto relacionado:**")
-        st.markdown("[S.I.E.G. Core →](https://sieg-core.streamlit.app)")
+        st.markdown("[S.I.E.G. Core →](https://sieg-intelligence-radar.streamlit.app)")
         st.code("mybloggingnotes@gmail.com", language=None)
 
     # Cabecera
