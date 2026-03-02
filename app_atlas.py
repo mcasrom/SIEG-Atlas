@@ -588,6 +588,13 @@ def render_module_detail(modulo: dict, df: pd.DataFrame) -> None:
             )
 
 
+
+def export_csv_atlas(df: pd.DataFrame) -> bytes:
+    """Genera CSV filtrado para descarga."""
+    return df[["dt", "modulo", "score"]].rename(columns={
+        "dt": "datetime", "modulo": "module", "score": "score_pct"
+    }).to_csv(index=False).encode("utf-8")
+
 # ---------------------------------------------------------------------------
 # ENTRYPOINT
 # ---------------------------------------------------------------------------
@@ -662,6 +669,37 @@ def main() -> None:
                 ),
             },
         )
+
+    with tab_overview:
+        st.divider()
+        st.subheader("📥 Exportar Datos")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            days_exp = st.selectbox("Periodo", [7, 30, 90, 365, 0],
+                format_func=lambda x: f"Ultimos {x} dias" if x > 0 else "Todo el historico",
+                key="atlas_exp_days")
+        with col2:
+            if not df_history.empty:
+                if days_exp > 0:
+                    cutoff = pd.Timestamp.now() - pd.Timedelta(days=days_exp)
+                    df_exp = df_history[df_history["dt"] >= cutoff]
+                else:
+                    df_exp = df_history
+                csv_bytes = export_csv_atlas(df_exp)
+                fname = f"sieg_atlas_{datetime.now().strftime('%Y-%m-%d')}_{'all' if days_exp==0 else str(days_exp)+'d'}.csv"
+                st.download_button(
+                    label=f"⬇ Descargar CSV ({len(df_exp)} filas)",
+                    data=csv_bytes,
+                    file_name=fname,
+                    mime="text/csv",
+                )
+        with col3:
+            if not df_history.empty:
+                st.caption(
+                    f"Total registros: {len(df_history):,} | "
+                    f"Desde: {df_history['dt'].min().strftime('%d/%m/%Y')} | "
+                    f"Hasta: {df_history['dt'].max().strftime('%d/%m/%Y')}"
+                )
 
     with tab_oil:
         render_oil_panel()
