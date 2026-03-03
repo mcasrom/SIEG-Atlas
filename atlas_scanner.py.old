@@ -1,44 +1,39 @@
 #!/usr/bin/env python3
 """
-SIEG-Atlas Scanner V1.3 — Autolearning de Fuentes + Flash News
-Novedades vs V1.2:
+SIEG-Atlas Scanner V1.2 — Autolearning de Fuentes
+Novedades vs V1.1:
   - Sistema de 3 capas: primarias -> banco alternativas -> Google News RSS
   - Indicador de calidad por modulo: VERDE/AZUL/AMARILLO/NARANJA/ROJO
   - Criterio minimo: 40 noticias procesadas por modulo
   - Fallback automatico hasta alcanzar el minimo
   - Calidad guardada en JSON y mostrada en terminal
-  - Flash News: detección de eventos críticos de muy alto impacto (TTL + límite)
 """
+
 import json
 import logging
 import re
 import time
 from datetime import datetime
 from pathlib import Path
+
 import requests
 import xml.etree.ElementTree as ET
 
 # ---------------------------------------------------------------------------
 # CONFIGURACION
 # ---------------------------------------------------------------------------
-BASE_DIR = Path(__file__).resolve().parent
-DATA_LIVE = BASE_DIR / "data" / "live"
-DATA_STATIC = BASE_DIR / "data" / "static"
-MAPA_FUENTES = BASE_DIR / "mapa_atlas.txt"
-HISTORY_CSV = DATA_LIVE / "history_atlas.csv"
-LEARNED_FILE = DATA_LIVE / "atlas_learned_sources.json"
-FLASHES_FILE = DATA_LIVE / "atlas_flashes.json"
 
-RSS_ITEMS = 20
-TIMEOUT_HTTP = 12
-VERSION = "V1.3"
-MIN_NOTICIAS = 40  # Umbral minimo aceptable de noticias por modulo
+BASE_DIR      = Path(__file__).resolve().parent
+DATA_LIVE     = BASE_DIR / "data" / "live"
+DATA_STATIC   = BASE_DIR / "data" / "static"
+MAPA_FUENTES  = BASE_DIR / "mapa_atlas.txt"
+HISTORY_CSV   = DATA_LIVE / "history_atlas.csv"
+LEARNED_FILE  = DATA_LIVE / "atlas_learned_sources.json"
 
-# Flash config
-FLASH_TTL_H    = 48
-FLASH_SCORE    = 55    # umbral Atlas (modulos mas bajos que Core)
-FLASH_MAX      = 15
-FLASH_POR_MOD  = 3
+RSS_ITEMS     = 20
+TIMEOUT_HTTP  = 12
+VERSION       = "V1.2"
+MIN_NOTICIAS  = 40     # Umbral minimo aceptable de noticias por modulo
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,187 +44,98 @@ log = logging.getLogger("ATLAS")
 
 # ---------------------------------------------------------------------------
 # INDICADOR DE CALIDAD
+# Verde:    >= 60 noticias  (cobertura optima)
+# Azul:     >= 40 noticias  (cobertura aceptable — minimo)
+# Amarillo: >= 25 noticias  (cobertura reducida)
+# Naranja:  >= 10 noticias  (cobertura critica)
+# Rojo:      < 10 noticias  (sin cobertura — solo suelo base)
 # ---------------------------------------------------------------------------
+
 def calcular_calidad(n_noticias: int, n_fuentes_activas: int,
                      uso_fallback: bool, uso_web: bool) -> dict:
     if n_noticias >= 60:
-        nivel, emoji, css = "VERDE", "🟢", "green"
+        nivel, emoji, css = "VERDE",    "🟢", "green"
     elif n_noticias >= 40:
-        nivel, emoji, css = "AZUL", "🔵", "blue"
+        nivel, emoji, css = "AZUL",     "🔵", "blue"
     elif n_noticias >= 25:
         nivel, emoji, css = "AMARILLO", "🟡", "yellow"
     elif n_noticias >= 10:
-        nivel, emoji, css = "NARANJA", "🟠", "orange"
+        nivel, emoji, css = "NARANJA",  "🟠", "orange"
     else:
-        nivel, emoji, css = "ROJO", "🔴", "red"
+        nivel, emoji, css = "ROJO",     "🔴", "red"
+
     return {
-        "nivel": nivel,
-        "emoji": emoji,
-        "css": css,
-        "noticias": n_noticias,
-        "fuentes_activas": n_fuentes_activas,
-        "uso_fallback": uso_fallback,
-        "uso_web": uso_web,
+        "nivel":            nivel,
+        "emoji":            emoji,
+        "css":              css,
+        "noticias":         n_noticias,
+        "fuentes_activas":  n_fuentes_activas,
+        "uso_fallback":     uso_fallback,
+        "uso_web":          uso_web,
     }
 
 # ---------------------------------------------------------------------------
-# FLASH NEWS — Atlas V1.3
-# ---------------------------------------------------------------------------
-FLASH_TRIGGERS_ATLAS = {
-    "Petroleo": [
-        "oil embargo", "opec cuts", "pipeline explosion", "pipeline attack",
-        "saudi attack", "aramco attack", "oil price spike",
-        "brent above 120", "energy crisis", "gas cutoff",
-        "lng terminal attack", "refinery explosion",
-    ],
-    "Maritimo": [
-        "hormuz closed", "hormuz blocked", "suez closed", "canal blocked",
-        "red sea closed", "bab el-mandeb", "malacca strait",
-        "warship sunk", "tanker seized", "tanker attacked",
-        "naval blockade", "houthi sinks", "drone hits tanker",
-        "port blockade", "shipping halted",
-    ],
-    "Cables": [
-        "submarine cable cut", "undersea cable severed", "internet outage",
-        "cable sabotage", "fiber cut", "internet blackout",
-        "transatlantic cable", "pacific cable cut",
-    ],
-    "MarChina": [
-        "taiwan invasion", "taiwan blockade", "pla naval", "pla crosses",
-        "strait of taiwan blocked", "south china sea clash",
-        "philippine vessel attacked", "us carrier attacked",
-        "spratly incident", "paracel incident",
-    ],
-    "Espacio": [
-        "asat test", "satellite destroyed", "starlink down",
-        "gps disrupted", "space weapon", "orbital attack",
-        "satellite collision", "anti-satellite missile",
-        "space debris crisis",
-    ],
-    "Ciber": [
-        "critical infrastructure hack", "power grid attack",
-        "water system hack", "hospital ransomware",
-        "nuclear plant cyber", "bank system down",
-        "government systems down", "apt attack",
-        "supply chain attack", "zero-day exploit critical",
-    ],
-}
-
-MODULO_ICONOS = {
-    "Petroleo": "🛢",
-    "Maritimo": "⚓",
-    "Cables":   "🔌",
-    "MarChina": "🌊",
-    "Espacio":  "🛰",
-    "Ciber":    "💻",
-}
-
-def cargar_flashes() -> list:
-    if not FLASHES_FILE.exists():
-        return []
-    try:
-        with open(FLASHES_FILE) as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return []
-
-def guardar_flashes(flashes: list) -> None:
-    try:
-        with open(FLASHES_FILE, "w") as f:
-            json.dump(flashes, f, indent=2, ensure_ascii=False)
-    except OSError as e:
-        log.warning("No se pudo guardar atlas_flashes: %s", e)
-
-def purgar_flashes_expirados(flashes: list, ahora: float) -> list:
-    ttl_s = FLASH_TTL_H * 3600
-    return [f for f in flashes if (ahora - f.get("ts", 0)) < ttl_s]
-
-def extraer_flashes_modulo(noticias: list, modulo: str,
-                           score: float, ahora: float) -> list:
-    if score < FLASH_SCORE:
-        return []
-    triggers = FLASH_TRIGGERS_ATLAS.get(modulo, [])
-    icono    = MODULO_ICONOS.get(modulo, "🔴")
-    nuevos   = []
-    for n in noticias:
-        texto      = n.get("text", "").lower()
-        titulo_raw = n.get("text", "").split(".", 1)[0].strip()
-        titulo     = titulo_raw[:130] if len(titulo_raw) > 130 else titulo_raw
-        if not titulo:
-            continue
-        trigger_hit = next((t for t in triggers if t in texto), None)
-        if trigger_hit:
-            nuevos.append({
-                "ts": ahora,
-                "modulo": modulo,
-                "icono": icono,
-                "titulo": titulo,
-                "trigger": trigger_hit,
-                "score": int(score),
-                "cf": round(float(n.get("cf", 0.7)), 2),
-            })
-        if len(nuevos) >= FLASH_POR_MOD:
-            break
-    return nuevos
-
-# ---------------------------------------------------------------------------
 # BANCO DE FUENTES ALTERNATIVAS (CAPA 2)
+# Fuentes de respaldo por modulo — activadas si primarias insuficientes
 # ---------------------------------------------------------------------------
+
 FALLBACK_SOURCES = {
     "Petroleo": [
-        {"url": "https://www.ft.com/rss/home/uk", "cf": 0.9},
-        {"url": "https://www.wsj.com/xml/rss/3_7085.xml", "cf": 0.9},
-        {"url": "https://feeds.skynews.com/feeds/rss/business.xml", "cf": 0.8},
-        {"url": "https://www.cnbc.com/id/10001147/device/rss/rss.html", "cf": 0.8},
-        {"url": "https://feeds.feedburner.com/PetroleumEconomist", "cf": 0.9},
+        {"url": "https://www.ft.com/rss/home/uk",                          "cf": 0.9},
+        {"url": "https://www.wsj.com/xml/rss/3_7085.xml",                  "cf": 0.9},
+        {"url": "https://feeds.skynews.com/feeds/rss/business.xml",        "cf": 0.8},
+        {"url": "https://www.cnbc.com/id/10001147/device/rss/rss.html",    "cf": 0.8},
+        {"url": "https://feeds.feedburner.com/PetroleumEconomist",         "cf": 0.9},
     ],
     "Maritimo": [
-        {"url": "https://www.navalnews.com/feed/", "cf": 0.9},
-        {"url": "https://www.maritimebulletin.net/feed/", "cf": 0.8},
-        {"url": "https://feeds.skynews.com/feeds/rss/world.xml", "cf": 0.8},
-        {"url": "https://www.defensenews.com/rss/", "cf": 0.8},
-        {"url": "https://www.janes.com/feeds/news", "cf": 0.9},
+        {"url": "https://www.navalnews.com/feed/",                         "cf": 0.9},
+        {"url": "https://www.maritimebulletin.net/feed/",                  "cf": 0.8},
+        {"url": "https://feeds.skynews.com/feeds/rss/world.xml",           "cf": 0.8},
+        {"url": "https://www.defensenews.com/rss/",                        "cf": 0.8},
+        {"url": "https://www.janes.com/feeds/news",                        "cf": 0.9},
     ],
     "Cables": [
-        {"url": "https://feeds.arstechnica.com/arstechnica/index", "cf": 0.8},
-        {"url": "https://www.zdnet.com/news/rss.xml", "cf": 0.8},
-        {"url": "https://feeds.skynews.com/feeds/rss/technology.xml", "cf": 0.8},
-        {"url": "https://www.computerweekly.com/rss", "cf": 0.7},
-        {"url": "https://www.networkworld.com/index.rss", "cf": 0.7},
+        {"url": "https://feeds.arstechnica.com/arstechnica/index",         "cf": 0.8},
+        {"url": "https://www.zdnet.com/news/rss.xml",                      "cf": 0.8},
+        {"url": "https://feeds.skynews.com/feeds/rss/technology.xml",      "cf": 0.8},
+        {"url": "https://www.computerweekly.com/rss",                      "cf": 0.7},
+        {"url": "https://www.networkworld.com/index.rss",                  "cf": 0.7},
     ],
     "MarChina": [
-        {"url": "https://feeds.skynews.com/feeds/rss/world.xml", "cf": 0.8},
-        {"url": "https://www.defensenews.com/rss/", "cf": 0.8},
-        {"url": "https://foreignpolicy.com/feed/", "cf": 0.9},
-        {"url": "https://www.scmp.com/rss/91/feed", "cf": 0.7},
-        {"url": "https://asia.nikkei.com/rss/feed/nar", "cf": 0.8},
+        {"url": "https://feeds.skynews.com/feeds/rss/world.xml",           "cf": 0.8},
+        {"url": "https://www.defensenews.com/rss/",                        "cf": 0.8},
+        {"url": "https://foreignpolicy.com/feed/",                         "cf": 0.9},
+        {"url": "https://www.scmp.com/rss/91/feed",                        "cf": 0.7},
+        {"url": "https://asia.nikkei.com/rss/feed/nar",                    "cf": 0.8},
     ],
     "Espacio": [
-        {"url": "https://www.spaceflightnow.com/feed/", "cf": 0.9},
-        {"url": "https://feeds.skynews.com/feeds/rss/science.xml", "cf": 0.8},
-        {"url": "https://phys.org/rss-feed/space-news/", "cf": 0.8},
-        {"url": "https://www.universetoday.com/feed/", "cf": 0.7},
-        {"url": "https://astronomy.com/rss/news", "cf": 0.7},
+        {"url": "https://www.spaceflightnow.com/feed/",                    "cf": 0.9},
+        {"url": "https://feeds.skynews.com/feeds/rss/science.xml",         "cf": 0.8},
+        {"url": "https://phys.org/rss-feed/space-news/",                   "cf": 0.8},
+        {"url": "https://www.universetoday.com/feed/",                     "cf": 0.7},
+        {"url": "https://astronomy.com/rss/news",                          "cf": 0.7},
     ],
     "Ciber": [
-        {"url": "https://www.securityweek.com/feed/", "cf": 0.9},
-        {"url": "https://www.helpnetsecurity.com/feed/", "cf": 0.8},
-        {"url": "https://feeds.skynews.com/feeds/rss/technology.xml", "cf": 0.8},
-        {"url": "https://www.infosecurity-magazine.com/rss/news/", "cf": 0.8},
-        {"url": "https://www.cyberscoop.com/feed/", "cf": 0.9},
+        {"url": "https://www.securityweek.com/feed/",                      "cf": 0.9},
+        {"url": "https://www.helpnetsecurity.com/feed/",                   "cf": 0.8},
+        {"url": "https://feeds.skynews.com/feeds/rss/technology.xml",      "cf": 0.8},
+        {"url": "https://www.infosecurity-magazine.com/rss/news/",         "cf": 0.8},
+        {"url": "https://www.cyberscoop.com/feed/",                        "cf": 0.9},
     ],
 }
 
 # ---------------------------------------------------------------------------
 # CAPA 3: GOOGLE NEWS RSS (ultimo recurso)
+# Genera URL de busqueda RSS por terminos clave del modulo
 # ---------------------------------------------------------------------------
+
 GOOGLE_NEWS_QUERIES = {
-    "Petroleo": "oil+gas+opec+energy+petroleum",
-    "Maritimo": "maritime+shipping+houthi+red+sea+hormuz",
-    "Cables": "submarine+cable+internet+infrastructure",
-    "MarChina": "south+china+sea+taiwan+strait+naval",
-    "Espacio": "satellite+space+launch+military+orbit",
-    "Ciber": "cyberattack+hacking+ransomware+apt",
+    "Petroleo":  "oil+gas+opec+energy+petroleum",
+    "Maritimo":  "maritime+shipping+houthi+red+sea+hormuz",
+    "Cables":    "submarine+cable+internet+infrastructure",
+    "MarChina":  "south+china+sea+taiwan+strait+naval",
+    "Espacio":   "satellite+space+launch+military+orbit",
+    "Ciber":     "cyberattack+hacking+ransomware+apt",
 }
 
 def build_google_news_url(modulo: str) -> str:
@@ -237,11 +143,12 @@ def build_google_news_url(modulo: str) -> str:
     return f"https://news.google.com/rss/search?q={query}&hl=en&gl=US&ceid=US:en"
 
 # ---------------------------------------------------------------------------
-# VOCABULARIO
+# VOCABULARIO (heredado de V1.1)
 # ---------------------------------------------------------------------------
+
 KEYWORDS = {
     "Petroleo": {
-        "alto": [
+        "alto":  [
             "oil spill", "pipeline attack", "refinery fire", "opec cut",
             "embargo", "sanctions oil", "supply disruption", "tanker seized",
             "oil embargo", "energy blockade", "fuel crisis", "opec emergency",
@@ -261,7 +168,7 @@ KEYWORDS = {
         ],
     },
     "Maritimo": {
-        "alto": [
+        "alto":  [
             "ship seized", "vessel attacked", "naval incident", "strait closed",
             "piracy attack", "mine detected", "warship blocked", "maritime clash",
             "houthi attack", "houthi missile", "houthi drone", "red sea attack",
@@ -283,7 +190,7 @@ KEYWORDS = {
         ],
     },
     "Cables": {
-        "alto": [
+        "alto":  [
             "cable cut", "submarine cable severed", "cable sabotage",
             "undersea cable damaged", "internet outage", "fiber cut",
             "cable attack", "subsea sabotage", "network infrastructure attack",
@@ -299,7 +206,7 @@ KEYWORDS = {
         ],
     },
     "MarChina": {
-        "alto": [
+        "alto":  [
             "chinese warship", "pla navy", "south china sea clash",
             "taiwan strait incident", "island seized", "naval standoff",
             "coast guard confrontation", "military drills taiwan",
@@ -318,7 +225,7 @@ KEYWORDS = {
         ],
     },
     "Espacio": {
-        "alto": [
+        "alto":  [
             "satellite destroyed", "anti-satellite", "asat test",
             "space collision", "debris field", "orbital weapon",
             "space attack", "jamming satellite",
@@ -334,7 +241,7 @@ KEYWORDS = {
         ],
     },
     "Ciber": {
-        "alto": [
+        "alto":  [
             "critical infrastructure attack", "power grid hack",
             "state-sponsored attack", "cyberwarfare", "ransomware attack",
             "zero-day exploited", "apt attack", "election interference",
@@ -360,10 +267,10 @@ DEESCALATION = [
 SUELOS = {
     "Petroleo": 35,
     "Maritimo": 45,
-    "Cables": 15,
+    "Cables":   15,
     "MarChina": 42,
-    "Espacio": 20,
-    "Ciber": 33,
+    "Espacio":  20,
+    "Ciber":    33,
 }
 
 ALIASES = {
@@ -372,20 +279,22 @@ ALIASES = {
     "Maritimo": ["ship", "vessel", "tanker", "houthi", "red sea",
                  "hormuz", "suez", "naval", "maritime", "strait",
                  "cargo", "shipping", "port"],
-    "Cables": ["cable", "fiber", "internet", "network", "submarine",
-               "undersea", "telecom", "connectivity"],
+    "Cables":   ["cable", "fiber", "internet", "network", "submarine",
+                 "undersea", "telecom", "connectivity"],
     "MarChina": ["china", "taiwan", "philippines", "south china",
                  "pla", "beijing", "spratly"],
-    "Espacio": ["satellite", "rocket", "launch", "orbit", "space",
-                "missile", "debris", "starlink", "asat"],
-    "Ciber": ["cyber", "hack", "malware", "ransomware", "apt",
-              "breach", "attack", "vulnerability", "exploit"],
+    "Espacio":  ["satellite", "rocket", "launch", "orbit", "space",
+                 "missile", "debris", "starlink", "asat"],
+    "Ciber":    ["cyber", "hack", "malware", "ransomware", "apt",
+                 "breach", "attack", "vulnerability", "exploit"],
 }
 
 # ---------------------------------------------------------------------------
 # CARGA Y GUARDADO DE FUENTES APRENDIDAS
 # ---------------------------------------------------------------------------
+
 def cargar_fuentes_aprendidas() -> dict:
+    """Carga el historial de fuentes descubiertas en ciclos anteriores."""
     if not LEARNED_FILE.exists():
         return {}
     try:
@@ -393,6 +302,7 @@ def cargar_fuentes_aprendidas() -> dict:
             return json.load(f)
     except (OSError, json.JSONDecodeError):
         return {}
+
 
 def guardar_fuentes_aprendidas(aprendidas: dict) -> None:
     try:
@@ -404,6 +314,7 @@ def guardar_fuentes_aprendidas(aprendidas: dict) -> None:
 # ---------------------------------------------------------------------------
 # CARGA DE FUENTES PRIMARIAS
 # ---------------------------------------------------------------------------
+
 def cargar_fuentes() -> dict:
     fuentes = {}
     if not MAPA_FUENTES.exists():
@@ -425,68 +336,90 @@ def cargar_fuentes() -> dict:
 # ---------------------------------------------------------------------------
 # FETCH RSS — con contador de fuentes activas
 # ---------------------------------------------------------------------------
+
 def fetch_rss(fuentes_lista: list, modulo: str,
               label: str = "primaria") -> tuple:
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; SIEG-Atlas/1.3)"}
+    """
+    Descarga RSS. Retorna (noticias, n_fuentes_activas).
+    label: 'primaria' | 'fallback' | 'web'
+    """
+    headers  = {"User-Agent": "Mozilla/5.0 (compatible; SIEG-Atlas/1.2)"}
     noticias = []
-    activas = 0
+    activas  = 0
+
     for fuente in fuentes_lista:
         try:
             r = requests.get(fuente["url"], headers=headers,
                              timeout=TIMEOUT_HTTP)
             r.raise_for_status()
-            root = ET.fromstring(r.content)
+            root  = ET.fromstring(r.content)
             items = root.findall(".//item")[:RSS_ITEMS]
             if items:
                 activas += 1
             for item in items:
-                title_el = item.find("title")
-                desc_el = item.find("description")
-                title = (title_el.text or "") if title_el is not None else ""
-                desc = (desc_el.text or "") if desc_el is not None else ""
+                title_el    = item.find("title")
+                desc_el     = item.find("description")
+                title       = (title_el.text or "") if title_el is not None else ""
+                desc        = (desc_el.text  or "") if desc_el  is not None else ""
                 desc_limpio = re.sub(r"<[^>]+>", " ", desc)
                 noticias.append({
                     "text": f"{title} {desc_limpio}",
-                    "cf": fuente["cf"],
+                    "cf":   fuente["cf"],
                 })
         except requests.RequestException as e:
             if label == "primaria":
-                log.warning("%s | [%s] Fuente no disponible: %s", modulo, label, e)
+                log.warning("%s | [%s] Fuente no disponible: %s",
+                            modulo, label, e)
         except ET.ParseError as e:
             if label == "primaria":
-                log.warning("%s | [%s] RSS malformado: %s", modulo, label, e)
+                log.warning("%s | [%s] RSS malformado: %s",
+                            modulo, label, e)
+
     return noticias, activas
+
 
 # ---------------------------------------------------------------------------
 # SISTEMA DE 3 CAPAS — autolearning
 # ---------------------------------------------------------------------------
+
 def fetch_con_autolearning(modulo: str,
                            fuentes_primarias: list,
                            aprendidas: dict) -> tuple:
-    uso_fallback = False
-    uso_web = False
+    """
+    Intenta alcanzar MIN_NOTICIAS usando 3 capas:
+      1. Fuentes primarias (mapa_atlas.txt)
+      2. Banco de alternativas (FALLBACK_SOURCES)
+      3. Google News RSS (busqueda por keywords)
 
-    # CAPA 1: Primarias
+    Retorna (noticias, calidad_dict, aprendidas_actualizadas)
+    """
+    uso_fallback = False
+    uso_web      = False
+
+    # --- CAPA 1: Primarias ---
     noticias, activas = fetch_rss(fuentes_primarias, modulo, "primaria")
     log.info("%s | Capa 1 (primarias): %d noticias / %d fuentes activas",
              modulo, len(noticias), activas)
 
-    # CAPA 2: Fallback si insuficiente
+    # --- CAPA 2: Fallback si insuficiente ---
     if len(noticias) < MIN_NOTICIAS:
         uso_fallback = True
         fallbacks = FALLBACK_SOURCES.get(modulo, [])
+
+        # Incluir fuentes aprendidas en ciclos anteriores
         fuentes_aprendidas_modulo = [
             {"url": u, "cf": 0.7}
             for u in aprendidas.get(modulo, [])
         ]
         todas_fallback = fallbacks + fuentes_aprendidas_modulo
+
         n2, a2 = fetch_rss(todas_fallback, modulo, "fallback")
         noticias += n2
-        activas += a2
+        activas  += a2
         log.info("%s | Capa 2 (fallback): +%d noticias | Total: %d",
                  modulo, len(n2), len(noticias))
 
-    # CAPA 3: Google News RSS si sigue insuficiente
+    # --- CAPA 3: Google News RSS si sigue insuficiente ---
     if len(noticias) < MIN_NOTICIAS:
         uso_web = True
         google_url = build_google_news_url(modulo)
@@ -496,9 +429,11 @@ def fetch_con_autolearning(modulo: str,
                 modulo, "web"
             )
             noticias += n3
-            activas += a3
+            activas  += a3
             log.info("%s | Capa 3 (Google News): +%d noticias | Total: %d",
                      modulo, len(n3), len(noticias))
+
+            # Guardar URL de Google News como fuente aprendida si aportó noticias
             if n3:
                 if modulo not in aprendidas:
                     aprendidas[modulo] = []
@@ -512,34 +447,46 @@ def fetch_con_autolearning(modulo: str,
     calidad = calcular_calidad(len(noticias), activas, uso_fallback, uso_web)
     return noticias, calidad, aprendidas
 
+
 # ---------------------------------------------------------------------------
 # SCORING
 # ---------------------------------------------------------------------------
+
 def _score_texto(texto: str, modulo: str) -> float:
     t = texto.lower()
+
     deesc = sum(1 for w in DEESCALATION if w in t)
     if deesc >= 2:
         return 12.0
-    kw = KEYWORDS.get(modulo, {})
-    hits_alto = sum(1 for w in kw.get("alto", []) if w in t)
+
+    kw        = KEYWORDS.get(modulo, {})
+    hits_alto  = sum(1 for w in kw.get("alto",  []) if w in t)
     hits_medio = sum(1 for w in kw.get("medio", []) if w in t)
-    hits_bajo = sum(1 for w in kw.get("bajo", []) if w in t)
+    hits_bajo  = sum(1 for w in kw.get("bajo",  []) if w in t)
+
     if hits_alto + hits_medio + hits_bajo == 0:
         return 15.0
+
     score = (hits_alto * 25) + (hits_medio * 12) + (hits_bajo * 4)
+
     aliases = ALIASES.get(modulo, [])
     if any(a in t for a in aliases):
         score *= 1.25
+
     if deesc == 1:
         score *= 0.75
+
     return min(95.0, float(score))
+
 
 def calcular_score_modulo(noticias: list, modulo: str,
                           old_score: float) -> tuple:
     if not noticias:
         return int(old_score), []
+
     scores_pond, pesos, alertas = [], [], []
     kw_alto = KEYWORDS.get(modulo, {}).get("alto", [])
+
     for n in noticias:
         s = _score_texto(n["text"], modulo)
         scores_pond.append(s * n["cf"])
@@ -548,19 +495,25 @@ def calcular_score_modulo(noticias: list, modulo: str,
             titulo = n["text"][:120].strip()
             if titulo not in alertas:
                 alertas.append(titulo)
-    total_cf = sum(pesos)
+
+    total_cf    = sum(pesos)
     score_bruto = sum(scores_pond) / total_cf if total_cf > 0 else 15.0
-    suelo = SUELOS.get(modulo, 10)
+
+    suelo       = SUELOS.get(modulo, 10)
     score_suelo = max(score_bruto, suelo)
+
     if score_suelo < old_score:
         score_final = (old_score * 0.6) + (score_suelo * 0.4)
     else:
         score_final = score_suelo
+
     return max(10, min(100, int(score_final))), alertas[:5]
 
+
 # ---------------------------------------------------------------------------
-# HISTORICO y RESULTADOS
+# HISTORICO
 # ---------------------------------------------------------------------------
+
 def cargar_old_score(modulo: str) -> float:
     path = DATA_LIVE / f"atlas_{modulo.lower()}.json"
     try:
@@ -569,6 +522,7 @@ def cargar_old_score(modulo: str) -> float:
     except (OSError, json.JSONDecodeError, ValueError):
         return 20.0
 
+
 def guardar_resultado(modulo: str, score: int, alertas: list,
                       n_noticias: int, ts: float,
                       calidad: dict) -> None:
@@ -576,21 +530,23 @@ def guardar_resultado(modulo: str, score: int, alertas: list,
     try:
         with open(path, "w") as f:
             json.dump({
-                "modulo": modulo,
-                "score": score,
-                "alertas": alertas,
-                "noticias": n_noticias,
-                "timestamp": ts,
-                "version": VERSION,
-                "calidad_nivel": calidad["nivel"],
-                "calidad_emoji": calidad["emoji"],
-                "calidad_css": calidad["css"],
-                "fuentes_activas": calidad["fuentes_activas"],
-                "uso_fallback": calidad["uso_fallback"],
-                "uso_web": calidad["uso_web"],
+                "modulo":           modulo,
+                "score":            score,
+                "alertas":          alertas,
+                "noticias":         n_noticias,
+                "timestamp":        ts,
+                "version":          VERSION,
+                # NUEVO: indicador de calidad de fuentes
+                "calidad_nivel":    calidad["nivel"],
+                "calidad_emoji":    calidad["emoji"],
+                "calidad_css":      calidad["css"],
+                "fuentes_activas":  calidad["fuentes_activas"],
+                "uso_fallback":     calidad["uso_fallback"],
+                "uso_web":          calidad["uso_web"],
             }, f, indent=2, ensure_ascii=False)
     except OSError as e:
         log.error("%s | No se pudo guardar: %s", modulo, e)
+
 
 def guardar_historico(modulo: str, score: int, ts: float) -> None:
     try:
@@ -599,14 +555,16 @@ def guardar_historico(modulo: str, score: int, ts: float) -> None:
     except OSError as e:
         log.warning("No se pudo escribir historico: %s", e)
 
+
 # ---------------------------------------------------------------------------
 # SCAN PRINCIPAL
 # ---------------------------------------------------------------------------
+
 def scan() -> None:
     DATA_LIVE.mkdir(parents=True, exist_ok=True)
     DATA_STATIC.mkdir(parents=True, exist_ok=True)
 
-    fuentes = cargar_fuentes()
+    fuentes    = cargar_fuentes()
     aprendidas = cargar_fuentes_aprendidas()
 
     if not fuentes:
@@ -614,16 +572,10 @@ def scan() -> None:
         return
 
     ts = time.time()
-
-    # Flash News — inicialización
-    flashes_actuales = purgar_flashes_expirados(cargar_flashes(), ts)
-    nuevos_flashes_total = 0
-
     print(f"--- S.I.E.G. ATLAS SCANNER {VERSION} | "
-          f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
-    print(f" Umbral minimo: {MIN_NOTICIAS} noticias | "
-          f"Capas: primarias → fallback → Google News")
-    print(f" Flash News: ≥{FLASH_SCORE}% + trigger crítico (TTL {FLASH_TTL_H}h, max {FLASH_MAX})")
+          f"{datetime.now().strftime('%H:%M:%S')} ---")
+    print(f"    Umbral minimo: {MIN_NOTICIAS} noticias | "
+          f"Capas: primarias -> fallback -> Google News")
     print()
 
     resultados = {}
@@ -631,6 +583,7 @@ def scan() -> None:
     for modulo, data_fuentes in fuentes.items():
         old_score = cargar_old_score(modulo)
 
+        # Sistema de 3 capas
         noticias, calidad, aprendidas = fetch_con_autolearning(
             modulo, data_fuentes, aprendidas
         )
@@ -639,40 +592,31 @@ def scan() -> None:
 
         guardar_resultado(modulo, score, alertas, len(noticias), ts, calidad)
         guardar_historico(modulo, score, ts)
-
-        # Flash News
-        nuevos_flashes = extraer_flashes_modulo(noticias, modulo, score, ts)
-        flashes_actuales.extend(nuevos_flashes)
-        nuevos_flashes_total += len(nuevos_flashes)
-
         resultados[modulo] = score
-        delta = score - int(old_score)
+
+        delta     = score - int(old_score)
         delta_str = f"+{delta}" if delta > 0 else str(delta)
 
+        # Output con indicador de calidad
         icono_score = ("🚨" if score >= 70 else
                        "⚠️ " if score >= 45 else "✅")
         fallback_str = " [FB]" if calidad["uso_fallback"] else ""
-        web_str      = " [WEB]" if calidad["uso_web"] else ""
-        flash_str    = f" ⚡{len(nuevos_flashes)}" if nuevos_flashes else ""
+        web_str      = " [WEB]" if calidad["uso_web"]      else ""
 
         print(f"[{icono_score}] {modulo:12} | "
-              f"Score: {score:3}% ({delta_str:>4}){flash_str} | "
+              f"Score: {score:3}% ({delta_str:>4}) | "
               f"Noticias: {len(noticias):3} | "
               f"Calidad: {calidad['emoji']} {calidad['nivel']}"
               f"{fallback_str}{web_str}")
 
         for a in alertas:
-            print(f" ↳ {a[:100]}")
+            print(f"       ↳ {a[:100]}")
 
-    # Finalizar Flash News
-    flashes_actuales = flashes_actuales[-FLASH_MAX:]
-    guardar_flashes(flashes_actuales)
-
-    if nuevos_flashes_total > 0:
-        print(f"\n⚡ {nuevos_flashes_total} nuevo(s) FLASH(es) detectado(s) esta ejecución")
+    # Guardar fuentes aprendidas para proximos ciclos
+    guardar_fuentes_aprendidas(aprendidas)
 
     if resultados:
-        avg = sum(resultados.values()) // len(resultados)
+        avg     = sum(resultados.values()) // len(resultados)
         top_mod = max(resultados, key=resultados.get)
         print()
         print(f"--- Atlas completado: {len(resultados)} modulos | "
@@ -681,17 +625,15 @@ def scan() -> None:
         try:
             with open(DATA_LIVE / "atlas_global.json", "w") as f:
                 json.dump({
-                    "scores": resultados,
-                    "avg": avg,
-                    "top": top_mod,
+                    "scores":    resultados,
+                    "avg":       avg,
+                    "top":       top_mod,
                     "timestamp": ts,
-                    "version": VERSION,
-                    "flashes_count": nuevos_flashes_total,
+                    "version":   VERSION,
                 }, f, indent=2)
         except OSError as e:
             log.error("No se pudo guardar resumen global: %s", e)
 
-    guardar_fuentes_aprendidas(aprendidas)
 
 if __name__ == "__main__":
     scan()

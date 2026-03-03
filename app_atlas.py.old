@@ -1,12 +1,11 @@
 """
-S.I.E.G. ATLAS - Geopolitical Infrastructure Dashboard V1.1
+S.I.E.G. ATLAS - Geopolitical Infrastructure Dashboard V1.0
 Ejes: Petroleo | Maritimo | Cables | MarChina | Espacio | Ciber
 """
 
 import json
 import logging
 import os
-import time
 from datetime import datetime
 
 import pandas as pd
@@ -21,12 +20,9 @@ import streamlit as st
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 DATA_LIVE    = os.path.join(BASE_DIR, "data", "live")
 HISTORY_CSV  = os.path.join(DATA_LIVE, "history_atlas.csv")
-FLASHES_FILE = os.path.join(DATA_LIVE, "atlas_flashes.json")     # NUEVO
 
-APP_VERSION  = "V1.1"                                           # actualizado
+APP_VERSION  = "V1.0"
 BUILD_DATE   = "2026"
-
-FLASH_TTL_H  = 48                                               # NUEVO
 
 MODULOS = ["Petroleo", "Maritimo", "Cables", "MarChina", "Espacio", "Ciber"]
 
@@ -86,7 +82,7 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# CSS — con sección FLASH Atlas añadida al final (colores azul)
+# CSS
 # ---------------------------------------------------------------------------
 ATLAS_CSS = """
 <style>
@@ -133,48 +129,6 @@ h1, h2, h3 { color: #00ccff !important; font-family: 'Share Tech Mono', monospac
 .quality-yellow { background: #2a2a00; color: #ffdd00; border: 1px solid #ffdd00; }
 .quality-orange { background: #2a1a00; color: #ff8800; border: 1px solid #ff8800; }
 .quality-red    { background: #2a0000; color: #ff2222; border: 1px solid #ff2222; }
-
-/* ── FLASH TICKER Atlas ──────────────────────────────────── */
-.flash-ticker-wrap {
-    background: #000d1a; border-top: 1px solid #0077ff;
-    border-bottom: 1px solid #0077ff;
-    overflow: hidden; position: relative;
-    height: 36px; margin-bottom: 14px;
-}
-.flash-ticker-label {
-    position: absolute; left: 0; top: 0;
-    background: #0055cc; color: #fff;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.75em; font-weight: bold;
-    padding: 0 10px; height: 36px; line-height: 36px;
-    z-index: 2; letter-spacing: 0.1em; white-space: nowrap;
-}
-.flash-ticker-track {
-    display: inline-block; white-space: nowrap;
-    animation: ticker-scroll 50s linear infinite;
-    padding-left: 160px; line-height: 36px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.82em; color: #aaccff;
-}
-.flash-ticker-track:hover { animation-play-state: paused; }
-@keyframes ticker-scroll {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
-}
-.flash-item-ticker { margin-right: 60px; color: #cce4ff; }
-.flash-item-ticker b { color: #66aaff; }
-.flash-sidebar-item {
-    background: #050d1a; border-left: 3px solid #0055cc;
-    padding: 6px 10px; margin-bottom: 6px;
-    border-radius: 0 4px 4px 0; font-family: monospace;
-    font-size: 0.78em; color: #aaccff;
-}
-.flash-sidebar-item .flash-ts { color: #445566; font-size: 0.85em; }
-.flash-new-badge {
-    background: #0055cc; color: #fff;
-    font-size: 0.65em; padding: 1px 5px;
-    border-radius: 3px; margin-left: 4px; font-weight: bold;
-}
 </style>
 """
 
@@ -264,75 +218,6 @@ def load_history() -> pd.DataFrame:
     except Exception as e:
         logger.error("Error cargando historico: %s", e)
         return pd.DataFrame(columns=["timestamp", "modulo", "score", "dt"])
-
-
-@st.cache_data(ttl=60)
-def load_flashes() -> list:
-    if not os.path.exists(FLASHES_FILE):
-        return []
-    try:
-        with open(FLASHES_FILE) as f:
-            flashes = json.load(f)
-        ahora = time.time()
-        ttl_s = FLASH_TTL_H * 3600
-        return [fl for fl in flashes if (ahora - fl.get("ts", 0)) < ttl_s]
-    except (OSError, json.JSONDecodeError):
-        return []
-
-# ---------------------------------------------------------------------------
-# FLASH RENDER FUNCTIONS
-# ---------------------------------------------------------------------------
-
-def render_flash_ticker(flashes: list) -> None:
-    if not flashes:
-        return
-    items_html = ""
-    for fl in flashes:
-        modulo = fl.get("modulo", "")
-        icono  = fl.get("icono", "🔴")
-        titulo = fl.get("titulo", "")[:100]
-        score  = fl.get("score", 0)
-        items_html += (
-            f'<span class="flash-item-ticker">'
-            f'{icono} <b>[{modulo}·{score}%]</b> {titulo}'
-            f'</span>'
-        )
-    track = items_html * 2
-    st.markdown(
-        f'<div class="flash-ticker-wrap">'
-        f'<div class="flash-ticker-label">⚡ FLASH</div>'
-        f'<div class="flash-ticker-track">{track}</div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def render_flash_sidebar(flashes: list) -> None:
-    if not flashes:
-        st.markdown(
-            "<div style='font-family:monospace;font-size:0.78em;color:#334455'>"
-            "Sin eventos flash activos</div>",
-            unsafe_allow_html=True
-        )
-        return
-    ahora  = time.time()
-    recent = sorted(flashes, key=lambda x: x.get("ts", 0), reverse=True)[:8]
-    for fl in recent:
-        age_h  = (ahora - fl.get("ts", 0)) / 3600
-        badge  = '<span class="flash-new-badge">NEW</span>' if age_h < 24 else ""
-        modulo = fl.get("modulo", "")
-        icono  = fl.get("icono", "🔴")
-        titulo = fl.get("titulo", "")[:90]
-        score  = fl.get("score", 0)
-        ts_str = datetime.fromtimestamp(fl.get("ts", 0)).strftime("%d/%m %H:%M")
-        st.markdown(
-            f'<div class="flash-sidebar-item">'
-            f'{icono} <b>{modulo}</b> [{score}%]{badge}<br>'
-            f'{titulo}<br>'
-            f'<span class="flash-ts">{ts_str}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
 
 # ---------------------------------------------------------------------------
 # HELPERS
@@ -703,6 +588,7 @@ def render_module_detail(modulo: dict, df: pd.DataFrame) -> None:
             )
 
 
+
 def export_csv_atlas(df: pd.DataFrame) -> bytes:
     """Genera CSV filtrado para descarga."""
     return df[["dt", "modulo", "score"]].rename(columns={
@@ -725,7 +611,6 @@ def main() -> None:
     modulos    = load_all_modulos()
     df_history = load_history()
     trends     = compute_trends(df_history, modulos)
-    flashes    = load_flashes()   # NUEVO
 
     # Sidebar minimo
     with st.sidebar:
@@ -741,20 +626,12 @@ def main() -> None:
                 unsafe_allow_html=True,
             )
         st.divider()
-
-        # Nueva sección Flash en sidebar
-        st.divider()
-        st.markdown("**⚡ Flash News**")
-        render_flash_sidebar(flashes)
-
-        st.divider()
         st.markdown("**Proyecto relacionado:**")
         st.markdown("[S.I.E.G. Core →](https://sieg-intelligence-radar.streamlit.app)")
         st.code("mybloggingnotes@gmail.com", language=None)
 
     # Cabecera
     st.title("🌐 S.I.E.G. ATLAS — INFRASTRUCTURE INTELLIGENCE")
-    render_flash_ticker(flashes)        # NUEVO — antes de render_hero
     render_hero(modulos, df_history)
 
     # Tabs principales
@@ -992,3 +869,151 @@ de fuentes RSS abiertas. Scores 0-100% actualizados cada 60 minutos.
 ---
 
 ### Arquitectura
+
+```
+SIEG-Atlas/
+├── atlas_scanner.py      Motor V1.2 (autolearning 3 capas)
+├── app_atlas.py          Dashboard V1.0
+├── mapa_atlas.txt        ~30 fuentes RSS primarias
+├── update_atlas.sh       Git sync (cron: 15 * * * *)
+└── data/live/
+    ├── atlas_*.json      Score + calidad por eje
+    ├── history_atlas.csv Historico activo 90 dias
+    ├── atlas_learned_sources.json
+    └── archive/          .csv.gz + .tar.gz mensual
+```
+
+---
+
+### Autolearning — 3 Capas
+
+```
+Umbral: 40 noticias/eje
+
+Capa 1  mapa_atlas.txt (primarias)
+  ↓ si < 40
+Capa 2  FALLBACK_SOURCES [FB] + fuentes aprendidas
+  ↓ si < 40
+Capa 3  Google News RSS [WEB] → persiste en atlas_learned_sources.json
+```
+
+---
+
+### Google News Queries por Eje
+
+```
+Petroleo  → oil+gas+opec+energy+petroleum
+Maritimo  → maritime+shipping+houthi+red+sea+hormuz
+Cables    → submarine+cable+internet+infrastructure
+MarChina  → south+china+sea+taiwan+strait+naval
+Espacio   → satellite+space+launch+military+orbit
+Ciber     → cyberattack+hacking+ransomware+apt
+```
+
+---
+
+### Algoritmo de Scoring (identico a SIEG Core)
+
+```
+hits_alto  x22 + hits_medio x12 + hits_bajo x5
++ bonus x1.35 si region en texto (aliases)
+→ Score noticia = percentil 75 oraciones x CF
+→ Score bruto  = media ponderada CF
+→ Suelo        = max(base, media_reciente x 0.6)
+→ Inercia baja = 65% old + 35% nuevo
+```
+
+---
+
+### Crontab
+
+```
+15 * * * *  update_atlas.sh         (scanner + git push)
+0 2 * * 0   sieg_rotate.sh          (rotacion 90d)
+0 3 1 * *   sieg_backup_monthly.sh  (tar.gz mensual)
+```
+
+---
+
+### Proyeccion de Datos
+
+| Dataset | Filas/dia | MB/año | gzip/año |
+|---------|-----------|--------|----------|
+| history_atlas.csv | ~144 | ~18 MB | ~2 MB |
+| atlas_*.json (6) | estatico | < 200 KB | — |
+
+---
+
+### Changelog
+
+| Version | Cambios |
+|---------|---------|
+| Scanner V1.2 | Autolearning 3 capas, indicadores calidad, fuentes aprendidas |
+| Scanner V1.1 | Vocabulario maritimo Houthi, suelos reajustados |
+| Scanner V1.0 | 6 modulos, RSS-OSINT, scoring cinetico, suelos base |
+| Dashboard V1.0 | 8 tabs, precio petroleo RT, mapa incidentes, cyber timeline |
+            """)
+
+        with doc_download:
+            st.subheader("Documentacion Descargable")
+            st.divider()
+            c1, c2 = st.columns(2)
+
+            with c1:
+                st.markdown("#### 📘 Guia de Usuario (PDF)")
+                st.caption("Metodologia, niveles, glosario ES+EN, FAQ — ambos proyectos")
+                try:
+                    pdf_path = os.path.join(BASE_DIR, "docs", "user_guide.pdf")
+                    if os.path.exists(pdf_path):
+                        with open(pdf_path, "rb") as fh:
+                            st.download_button(
+                                label="⬇ Descargar user_guide.pdf",
+                                data=fh.read(),
+                                file_name="SIEG_user_guide.pdf",
+                                mime="application/pdf",
+                            )
+                    else:
+                        st.info("Coloca docs/user_guide.pdf en el repo para activar descarga.")
+                except Exception:
+                    st.info("Coloca docs/user_guide.pdf en el repo para activar descarga.")
+                st.markdown("[Ver en GitHub →](https://github.com/mcasrom/SIEG-Atlas/blob/main/docs/user_guide.pdf)")
+
+            with c2:
+                st.markdown("#### 🔧 Referencia Tecnica (Markdown)")
+                st.caption("Arquitectura, algoritmos, changelog Atlas para desarrolladores")
+                try:
+                    md_path = os.path.join(BASE_DIR, "docs", "technical_reference.md")
+                    if os.path.exists(md_path):
+                        with open(md_path, "r") as fh:
+                            md_bytes = fh.read().encode("utf-8")
+                        st.download_button(
+                            label="⬇ Descargar technical_reference.md",
+                            data=md_bytes,
+                            file_name="SIEG_Atlas_technical_reference.md",
+                            mime="text/markdown",
+                        )
+                    else:
+                        st.info("Coloca docs/technical_reference.md en el repo para activar descarga.")
+                except Exception:
+                    st.info("Coloca docs/technical_reference.md en el repo para activar descarga.")
+                st.markdown("[Ver en GitHub →](https://github.com/mcasrom/SIEG-Atlas/blob/main/docs/technical_reference.md)")
+
+            st.divider()
+            st.markdown("#### 🌐 Documentacion Web")
+            st.markdown("[mcasrom.github.io/SIEG-Core →](https://mcasrom.github.io/SIEG-Core/)")
+            st.markdown("[SIEG Core →](https://sieg-intelligence-radar.streamlit.app)")
+
+    st.markdown(f"""
+    <div class='sieg-footer'>
+        \U0001f30e S.I.E.G. ATLAS {APP_VERSION} &nbsp;&middot;&nbsp;
+        Infraestructura Critica Global &nbsp;&middot;&nbsp;
+        Scanner V1.2 autolearning<br>
+        &copy; {BUILD_DATE} <b>M. Castillo</b> &nbsp;&middot;&nbsp;
+        <a href='mailto:mybloggingnotes@gmail.com'>mybloggingnotes@gmail.com</a>
+        &nbsp;&middot;&nbsp; Nodo: Odroid-C2 / DietPi
+    </div>
+    """, unsafe_allow_html=True)
+
+
+if __name__ == "__main__":
+    main()
