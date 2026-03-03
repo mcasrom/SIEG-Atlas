@@ -884,33 +884,89 @@ def main() -> None:
             "📄 Descargar",
         ])
 
-    with tab_docs:
-        doc_user, doc_tech, doc_download = st.tabs([
-            "📘 Guia de Usuario",
-            "🔧 Referencia Tecnica",
-            "📄 Descargar",
-        ])
-
         with doc_user:
             st.markdown("""
-## Guia de Usuario — S.I.E.G. Atlas
+## S.I.E.G. Atlas — Guia de Usuario
 
-SIEG Atlas monitoriza seis ejes de infraestructura critica global mediante analisis
+**SIEG Atlas** monitoriza seis ejes de infraestructura crítica global mediante análisis
 de fuentes RSS abiertas. Scores 0-100% actualizados cada 60 minutos.
 
+---
+
 ### Ejes Monitorizados
-- Petroleo & Gas
-- Rutas Maritimas
-- Cables Submarinos
-- Mar de China
-- Espacio
-- Cibergeopolitica
+
+| Eje | Score base | Descripcion |
+|-----|-----------|-------------|
+| 🛢 Petroleo & Gas | 35% | Precios, OPEC, embargos, rutas suministro |
+| ⚓ Rutas Maritimas | 45% | Houthi, Mar Rojo, estrechos criticos |
+| 🔌 Cables Submarinos | 15% | Incidentes fibra optica submarina |
+| 🌊 Mar de China | 42% | Taiwan Strait, Spratly, PLA Navy |
+| 🛰 Espacio | 20% | ASAT, debris orbital, satelites militares |
+| 💻 Cibergeopolitica | 33% | APT estatales, infraestructura critica |
+
+---
 
 ### Niveles de Alerta
-- Critico: >= 80%
-- Alto: 60-79%
-- Medio: 40-59%
-- Normal: < 40%
+
+| Score | Nivel | Descripcion |
+|-------|-------|-------------|
+| >= 80% | 🔴 CRITICO | Riesgo inmediato para infraestructura |
+| 60-79% | 🟠 ALTO | Incidentes activos o amenaza sostenida |
+| 40-59% | 🟡 MEDIO | Tension elevada sin incidente confirmado |
+| < 40%  | 🟢 NORMAL | Situacion monitorizada |
+
+---
+
+### Calidad de Fuentes
+
+| Badge | Noticias | Significado |
+|-------|----------|-------------|
+| 🟢 VERDE | >= 60 | Cobertura optima |
+| 🔵 AZUL | >= 40 | Cobertura aceptable (minimo) |
+| 🟡 AMARILLO | 25-39 | Cobertura reducida |
+| 🟠 NARANJA | 10-24 | Cobertura critica |
+| 🔴 ROJO | < 10 | Sin cobertura — solo suelo base |
+
+`[FB]` = fuentes alternativas fallback &nbsp;|&nbsp; `[WEB]` = Google News RSS (capa 3)
+
+---
+
+### Tabs del Dashboard
+
+- **Overview** — 6 gauges con badge de calidad + tabla resumen + exportar CSV
+- **Petroleo** — Precio Brent/WTI en tiempo real + historico de tension
+- **Maritimo** — Estado de 5 estrechos criticos + alertas activas
+- **Cyber** — Timeline de actividad APT + alertas
+- **Mapa** — Puntos calientes geograficos por eje seleccionado
+- **Comparativa** — Evolucion multi-eje con umbrales de alerta
+- **Por Modulo** — Detalle individual con metricas y estadisticas
+
+---
+
+### Limitaciones
+
+- El sistema NO verifica la veracidad de noticias individuales
+- Un score alto = frecuencia de cobertura conflictiva, no confirmacion de hechos
+- El precio del petroleo (Yahoo Finance) tiene ~15min de diferido
+
+*EN: The system does NOT verify news veracity. Oil price has ~15min delay.*
+
+---
+
+### Glosario
+
+| Termino | ES | EN |
+|---------|----|----|
+| OSINT | Inteligencia fuentes abiertas | Open Source Intelligence |
+| CF | Coeficiente de Fiabilidad (0-1) | Reliability Coefficient |
+| APT | Amenaza Persistente Avanzada | Advanced Persistent Threat |
+| ASAT | Arma antisatelite | Anti-satellite weapon |
+| FONOP | Libertad de navegacion | Freedom of Navigation Operation |
+| Houthi | Milicia Yemen-Houthi | Houthi rebel group (Yemen) |
+| Brent | Petroleo crudo referencia europea | European crude oil benchmark |
+| WTI | West Texas Intermediate (USA) | US crude oil benchmark |
+| OPEC | Org. Paises Exportadores Petroleo | Organization of Petroleum Exporting Countries |
+| PLA | Ejercito Popular Liberacion China | People's Liberation Army |
 """)
 
         with doc_tech:
