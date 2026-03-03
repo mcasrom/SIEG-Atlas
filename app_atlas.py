@@ -1,11 +1,12 @@
 """
-S.I.E.G. ATLAS - Geopolitical Infrastructure Dashboard V1.0
+S.I.E.G. ATLAS - Geopolitical Infrastructure Dashboard V1.1
 Ejes: Petroleo | Maritimo | Cables | MarChina | Espacio | Ciber
 """
 
 import json
 import logging
 import os
+import time
 from datetime import datetime
 
 import pandas as pd
@@ -20,9 +21,11 @@ import streamlit as st
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 DATA_LIVE    = os.path.join(BASE_DIR, "data", "live")
 HISTORY_CSV  = os.path.join(DATA_LIVE, "history_atlas.csv")
+FLASHES_FILE = os.path.join(DATA_LIVE, "atlas_flashes.json")
 
-APP_VERSION  = "V1.0"
+APP_VERSION  = "V1.1"
 BUILD_DATE   = "2026"
+FLASH_TTL_H  = 48
 
 MODULOS = ["Petroleo", "Maritimo", "Cables", "MarChina", "Espacio", "Ciber"]
 
@@ -44,7 +47,6 @@ MODULO_DESC = {
     "Ciber":     "Alertas APT, ataques a infraestructura critica y actores estatales.",
 }
 
-# Coordenadas para mapa de incidentes por modulo
 MODULO_COORDS = {
     "Petroleo":  [(26.0,  56.0, "Golfo Persico"),
                   (25.0,  37.0, "Mar Rojo"),
@@ -82,7 +84,7 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# CSS
+# CSS — con sección FLASH Atlas añadida al final (colores azul)
 # ---------------------------------------------------------------------------
 ATLAS_CSS = """
 <style>
@@ -129,13 +131,54 @@ h1, h2, h3 { color: #00ccff !important; font-family: 'Share Tech Mono', monospac
 .quality-yellow { background: #2a2a00; color: #ffdd00; border: 1px solid #ffdd00; }
 .quality-orange { background: #2a1a00; color: #ff8800; border: 1px solid #ff8800; }
 .quality-red    { background: #2a0000; color: #ff2222; border: 1px solid #ff2222; }
+
+/* ── FLASH TICKER Atlas ──────────────────────────────────── */
+.flash-ticker-wrap {
+    background: #000d1a; border-top: 1px solid #0077ff;
+    border-bottom: 1px solid #0077ff;
+    overflow: hidden; position: relative;
+    height: 36px; margin-bottom: 14px;
+}
+.flash-ticker-label {
+    position: absolute; left: 0; top: 0;
+    background: #0055cc; color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75em; font-weight: bold;
+    padding: 0 10px; height: 36px; line-height: 36px;
+    z-index: 2; letter-spacing: 0.1em; white-space: nowrap;
+}
+.flash-ticker-track {
+    display: inline-block; white-space: nowrap;
+    animation: ticker-scroll 50s linear infinite;
+    padding-left: 160px; line-height: 36px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.82em; color: #aaccff;
+}
+.flash-ticker-track:hover { animation-play-state: paused; }
+@keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+.flash-item-ticker { margin-right: 60px; color: #cce4ff; }
+.flash-item-ticker b { color: #66aaff; }
+.flash-sidebar-item {
+    background: #050d1a; border-left: 3px solid #0055cc;
+    padding: 6px 10px; margin-bottom: 6px;
+    border-radius: 0 4px 4px 0; font-family: monospace;
+    font-size: 0.78em; color: #aaccff;
+}
+.flash-sidebar-item .flash-ts { color: #445566; font-size: 0.85em; }
+.flash-new-badge {
+    background: #0055cc; color: #fff;
+    font-size: 0.65em; padding: 1px 5px;
+    border-radius: 3px; margin-left: 4px; font-weight: bold;
+}
 </style>
 """
 
 # ---------------------------------------------------------------------------
 # PRECIO PETROLEO — API publica gratuita
 # ---------------------------------------------------------------------------
-
 @st.cache_data(ttl=300)
 def fetch_oil_price() -> dict:
     """Obtiene precio Brent y WTI via API publica."""
@@ -165,7 +208,6 @@ def fetch_oil_price() -> dict:
 # ---------------------------------------------------------------------------
 # CARGA DE DATOS
 # ---------------------------------------------------------------------------
-
 @st.cache_data(ttl=180)
 def load_modulo(modulo: str) -> dict:
     path = os.path.join(DATA_LIVE, f"atlas_{modulo.lower()}.json")
@@ -219,21 +261,90 @@ def load_history() -> pd.DataFrame:
         logger.error("Error cargando historico: %s", e)
         return pd.DataFrame(columns=["timestamp", "modulo", "score", "dt"])
 
+
+@st.cache_data(ttl=60)
+def load_flashes() -> list:
+    if not os.path.exists(FLASHES_FILE):
+        return []
+    try:
+        with open(FLASHES_FILE) as f:
+            flashes = json.load(f)
+        ahora = time.time()
+        ttl_s = FLASH_TTL_H * 3600
+        return [fl for fl in flashes if (ahora - fl.get("ts", 0)) < ttl_s]
+    except (OSError, json.JSONDecodeError):
+        return []
+
+# ---------------------------------------------------------------------------
+# FLASH RENDER FUNCTIONS
+# ---------------------------------------------------------------------------
+def render_flash_ticker(flashes: list) -> None:
+    if not flashes:
+        return
+    items_html = ""
+    for fl in flashes:
+        modulo = fl.get("modulo", "")
+        icono  = fl.get("icono", "🔴")
+        titulo = fl.get("titulo", "")[:100]
+        score  = fl.get("score", 0)
+        items_html += (
+            f'<span class="flash-item-ticker">'
+            f'{icono} <b>[{modulo}·{score}%]</b> {titulo}'
+            f'</span>'
+        )
+    track = items_html * 2
+    st.markdown(
+        f'<div class="flash-ticker-wrap">'
+        f'<div class="flash-ticker-label">⚡ FLASH</div>'
+        f'<div class="flash-ticker-track">{track}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_flash_sidebar(flashes: list) -> None:
+    if not flashes:
+        st.markdown(
+            "<div style='font-family:monospace;font-size:0.78em;color:#334455'>"
+            "Sin eventos flash activos</div>",
+            unsafe_allow_html=True
+        )
+        return
+    ahora  = time.time()
+    recent = sorted(flashes, key=lambda x: x.get("ts", 0), reverse=True)[:8]
+    for fl in recent:
+        age_h  = (ahora - fl.get("ts", 0)) / 3600
+        badge  = '<span class="flash-new-badge">NEW</span>' if age_h < 24 else ""
+        modulo = fl.get("modulo", "")
+        icono  = fl.get("icono", "🔴")
+        titulo = fl.get("titulo", "")[:90]
+        score  = fl.get("score", 0)
+        ts_str = datetime.fromtimestamp(fl.get("ts", 0)).strftime("%d/%m %H:%M")
+        st.markdown(
+            f'<div class="flash-sidebar-item">'
+            f'{icono} <b>{modulo}</b> [{score}%]{badge}<br>'
+            f'{titulo}<br>'
+            f'<span class="flash-ts">{ts_str}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
 # ---------------------------------------------------------------------------
 # HELPERS
 # ---------------------------------------------------------------------------
-
 def score_color_atlas(score: float) -> str:
     if score >= 70: return "#ff2222"
     if score >= 50: return "#ff8800"
     if score >= 30: return "#ffdd00"
     return "#00ccff"
 
+
 def score_label_atlas(score: float) -> str:
     if score >= 70: return "CRITICO"
     if score >= 50: return "ALTO"
     if score >= 30: return "MEDIO"
     return "NORMAL"
+
 
 def compute_trends(df: pd.DataFrame, modulos: list) -> dict:
     trends = {}
@@ -245,7 +356,6 @@ def compute_trends(df: pd.DataFrame, modulos: list) -> dict:
 # ---------------------------------------------------------------------------
 # COMPONENTES UI
 # ---------------------------------------------------------------------------
-
 def render_hero(modulos: list, df: pd.DataFrame) -> None:
     now_str    = datetime.now().strftime("%d-%m-%Y %H:%M:%S UTC")
     ts_vals    = [m["timestamp"] for m in modulos if m["timestamp"] > 0]
@@ -317,7 +427,7 @@ def render_gauge_grid(modulos: list, trends: dict) -> None:
                 margin=dict(t=50, b=10, l=10, r=10),
                 paper_bgcolor="#080a10",
             )
-            st.plotly_chart(fig, use_container_width=True,
+            st.plotly_chart(fig, width="stretch",
                             config={"displayModeBar": False})
 
             st.markdown(
@@ -328,7 +438,6 @@ def render_gauge_grid(modulos: list, trends: dict) -> None:
                 unsafe_allow_html=True,
             )
 
-            # Alertas activas bajo el gauge
             for alerta in m["alertas"][:2]:
                 st.markdown(
                     f"<div class='alert-box'>↳ {alerta[:90]}</div>",
@@ -412,7 +521,7 @@ def render_incident_map(modulos: list, selected_mod: str) -> None:
         margin=dict(t=10, b=10, l=0, r=0),
         height=380,
     )
-    st.plotly_chart(fig, use_container_width=True,
+    st.plotly_chart(fig, width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -447,7 +556,7 @@ def render_cyber_timeline(df: pd.DataFrame) -> None:
         margin=dict(t=20, b=20, l=10, r=10),
         height=320,
     )
-    st.plotly_chart(fig, use_container_width=True,
+    st.plotly_chart(fig, width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -535,7 +644,7 @@ def render_comparative(df: pd.DataFrame) -> None:
         margin=dict(t=20, b=20, l=10, r=10),
         height=360,
     )
-    st.plotly_chart(fig, use_container_width=True,
+    st.plotly_chart(fig, width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -570,7 +679,7 @@ def render_module_detail(modulo: dict, df: pd.DataFrame) -> None:
             margin=dict(t=10, b=10, l=10, r=10),
             height=260,
         )
-        st.plotly_chart(fig, use_container_width=True,
+        st.plotly_chart(fig, width="stretch",
                         config={"displayModeBar": False})
         st.caption(
             f"Min: {df_m['score'].min():.0f}% · "
@@ -588,7 +697,6 @@ def render_module_detail(modulo: dict, df: pd.DataFrame) -> None:
             )
 
 
-
 def export_csv_atlas(df: pd.DataFrame) -> bytes:
     """Genera CSV filtrado para descarga."""
     return df[["dt", "modulo", "score"]].rename(columns={
@@ -598,7 +706,6 @@ def export_csv_atlas(df: pd.DataFrame) -> bytes:
 # ---------------------------------------------------------------------------
 # ENTRYPOINT
 # ---------------------------------------------------------------------------
-
 def main() -> None:
     st.set_page_config(
         page_title="S.I.E.G. ATLAS",
@@ -611,8 +718,8 @@ def main() -> None:
     modulos    = load_all_modulos()
     df_history = load_history()
     trends     = compute_trends(df_history, modulos)
+    flashes    = load_flashes()
 
-    # Sidebar minimo
     with st.sidebar:
         st.header("🌐 S.I.E.G. ATLAS")
         st.caption(f"Version: {APP_VERSION}")
@@ -626,15 +733,19 @@ def main() -> None:
                 unsafe_allow_html=True,
             )
         st.divider()
+        # Nueva sección Flash en sidebar
+        st.divider()
+        st.markdown("**⚡ Flash News**")
+        render_flash_sidebar(flashes)
+        st.divider()
         st.markdown("**Proyecto relacionado:**")
         st.markdown("[S.I.E.G. Core →](https://sieg-intelligence-radar.streamlit.app)")
         st.code("mybloggingnotes@gmail.com", language=None)
 
-    # Cabecera
     st.title("🌐 S.I.E.G. ATLAS — INFRASTRUCTURE INTELLIGENCE")
+    render_flash_ticker(flashes)
     render_hero(modulos, df_history)
 
-    # Tabs principales
     tab_overview, tab_oil, tab_maritime, tab_cyber, tab_map, tab_comparative, tab_detail, tab_docs = st.tabs([
         "📊 Overview",
         "🛢 Petroleo",
@@ -649,9 +760,7 @@ def main() -> None:
     with tab_overview:
         st.subheader("Estado Actual — 6 Ejes Geopoliticos")
         render_gauge_grid(modulos, trends)
-
         st.divider()
-        # Tabla resumen
         rows = [{
             "Modulo":    m["display"],
             "Score %":   int(m["score"]),
@@ -663,7 +772,7 @@ def main() -> None:
         st.dataframe(
             pd.DataFrame(rows),
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
             column_config={
                 "Score %": st.column_config.ProgressColumn(
                     "Score %", min_value=0, max_value=100, format="%d%%"
@@ -725,7 +834,7 @@ def main() -> None:
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=300,
             )
-            st.plotly_chart(fig, use_container_width=True,
+            st.plotly_chart(fig, width="stretch",
                             config={"displayModeBar": False})
 
     with tab_maritime:
@@ -775,245 +884,57 @@ def main() -> None:
             "📄 Descargar",
         ])
 
+    with tab_docs:
+        doc_user, doc_tech, doc_download = st.tabs([
+            "📘 Guia de Usuario",
+            "🔧 Referencia Tecnica",
+            "📄 Descargar",
+        ])
+
         with doc_user:
             st.markdown("""
-## S.I.E.G. Atlas — Guia de Usuario
+## Guia de Usuario — S.I.E.G. Atlas
 
-**SIEG Atlas** monitoriza seis ejes de infraestructura crítica global mediante análisis
+SIEG Atlas monitoriza seis ejes de infraestructura critica global mediante analisis
 de fuentes RSS abiertas. Scores 0-100% actualizados cada 60 minutos.
 
----
-
 ### Ejes Monitorizados
-
-| Eje | Score base | Descripcion |
-|-----|-----------|-------------|
-| 🛢 Petroleo & Gas | 35% | Precios, OPEC, embargos, rutas suministro |
-| ⚓ Rutas Maritimas | 45% | Houthi, Mar Rojo, estrechos criticos |
-| 🔌 Cables Submarinos | 15% | Incidentes fibra optica submarina |
-| 🌊 Mar de China | 42% | Taiwan Strait, Spratly, PLA Navy |
-| 🛰 Espacio | 20% | ASAT, debris orbital, satelites militares |
-| 💻 Cibergeopolitica | 33% | APT estatales, infraestructura critica |
-
----
+- Petroleo & Gas
+- Rutas Maritimas
+- Cables Submarinos
+- Mar de China
+- Espacio
+- Cibergeopolitica
 
 ### Niveles de Alerta
-
-| Score | Nivel | Descripcion |
-|-------|-------|-------------|
-| >= 80% | 🔴 CRITICO | Riesgo inmediato para infraestructura |
-| 60-79% | 🟠 ALTO | Incidentes activos o amenaza sostenida |
-| 40-59% | 🟡 MEDIO | Tension elevada sin incidente confirmado |
-| < 40%  | 🟢 NORMAL | Situacion monitorizada |
-
----
-
-### Calidad de Fuentes
-
-| Badge | Noticias | Significado |
-|-------|----------|-------------|
-| 🟢 VERDE | >= 60 | Cobertura optima |
-| 🔵 AZUL | >= 40 | Cobertura aceptable (minimo) |
-| 🟡 AMARILLO | 25-39 | Cobertura reducida |
-| 🟠 NARANJA | 10-24 | Cobertura critica |
-| 🔴 ROJO | < 10 | Sin cobertura — solo suelo base |
-
-`[FB]` = fuentes alternativas fallback &nbsp;|&nbsp; `[WEB]` = Google News RSS (capa 3)
-
----
-
-### Tabs del Dashboard
-
-- **Overview** — 6 gauges con badge de calidad + tabla resumen + exportar CSV
-- **Petroleo** — Precio Brent/WTI en tiempo real + historico de tension
-- **Maritimo** — Estado de 5 estrechos criticos + alertas activas
-- **Cyber** — Timeline de actividad APT + alertas
-- **Mapa** — Puntos calientes geograficos por eje seleccionado
-- **Comparativa** — Evolucion multi-eje con umbrales de alerta
-- **Por Modulo** — Detalle individual con metricas y estadisticas
-
----
-
-### Limitaciones
-
-- El sistema NO verifica la veracidad de noticias individuales
-- Un score alto = frecuencia de cobertura conflictiva, no confirmacion de hechos
-- El precio del petroleo (Yahoo Finance) tiene ~15min de diferido
-
-*EN: The system does NOT verify news veracity. Oil price has ~15min delay.*
-
----
-
-### Glosario
-
-| Termino | ES | EN |
-|---------|----|----|
-| OSINT | Inteligencia fuentes abiertas | Open Source Intelligence |
-| CF | Coeficiente de Fiabilidad (0-1) | Reliability Coefficient |
-| APT | Amenaza Persistente Avanzada | Advanced Persistent Threat |
-| ASAT | Arma antisatelite | Anti-satellite weapon |
-| FONOP | Libertad de navegacion | Freedom of Navigation Operation |
-| Houthi | Milicia Yemen-Houthi | Houthi rebel group (Yemen) |
-| Brent | Petroleo crudo referencia europea | European crude oil benchmark |
-| WTI | West Texas Intermediate (USA) | US crude oil benchmark |
-| OPEC | Org. Paises Exportadores Petroleo | Organization of Petroleum Exporting Countries |
-| PLA | Ejercito Popular Liberacion China | People's Liberation Army |
-            """)
+- Critico: >= 80%
+- Alto: 60-79%
+- Medio: 40-59%
+- Normal: < 40%
+""")
 
         with doc_tech:
             st.markdown("""
-## Referencia Tecnica — SIEG Atlas
+## Referencia Tecnica — S.I.E.G. Atlas
 
-**Scanner V1.2 · Dashboard V1.0 · Odroid-C2 · DietPi**
-
----
+Scanner V1.2 · Dashboard V1.1 · Odroid-C2 · DietPi
 
 ### Arquitectura
-
-```
-SIEG-Atlas/
-├── atlas_scanner.py      Motor V1.2 (autolearning 3 capas)
-├── app_atlas.py          Dashboard V1.0
-├── mapa_atlas.txt        ~30 fuentes RSS primarias
-├── update_atlas.sh       Git sync (cron: 15 * * * *)
-└── data/live/
-    ├── atlas_*.json      Score + calidad por eje
-    ├── history_atlas.csv Historico activo 90 dias
-    ├── atlas_learned_sources.json
-    └── archive/          .csv.gz + .tar.gz mensual
-```
-
----
-
-### Autolearning — 3 Capas
-
-```
-Umbral: 40 noticias/eje
-
-Capa 1  mapa_atlas.txt (primarias)
-  ↓ si < 40
-Capa 2  FALLBACK_SOURCES [FB] + fuentes aprendidas
-  ↓ si < 40
-Capa 3  Google News RSS [WEB] → persiste en atlas_learned_sources.json
-```
-
----
-
-### Google News Queries por Eje
-
-```
-Petroleo  → oil+gas+opec+energy+petroleum
-Maritimo  → maritime+shipping+houthi+red+sea+hormuz
-Cables    → submarine+cable+internet+infrastructure
-MarChina  → south+china+sea+taiwan+strait+naval
-Espacio   → satellite+space+launch+military+orbit
-Ciber     → cyberattack+hacking+ransomware+apt
-```
-
----
-
-### Algoritmo de Scoring (identico a SIEG Core)
-
-```
-hits_alto  x22 + hits_medio x12 + hits_bajo x5
-+ bonus x1.35 si region en texto (aliases)
-→ Score noticia = percentil 75 oraciones x CF
-→ Score bruto  = media ponderada CF
-→ Suelo        = max(base, media_reciente x 0.6)
-→ Inercia baja = 65% old + 35% nuevo
-```
-
----
-
-### Crontab
-
-```
-15 * * * *  update_atlas.sh         (scanner + git push)
-0 2 * * 0   sieg_rotate.sh          (rotacion 90d)
-0 3 1 * *   sieg_backup_monthly.sh  (tar.gz mensual)
-```
-
----
-
-### Proyeccion de Datos
-
-| Dataset | Filas/dia | MB/año | gzip/año |
-|---------|-----------|--------|----------|
-| history_atlas.csv | ~144 | ~18 MB | ~2 MB |
-| atlas_*.json (6) | estatico | < 200 KB | — |
-
----
-
-### Changelog
-
-| Version | Cambios |
-|---------|---------|
-| Scanner V1.2 | Autolearning 3 capas, indicadores calidad, fuentes aprendidas |
-| Scanner V1.1 | Vocabulario maritimo Houthi, suelos reajustados |
-| Scanner V1.0 | 6 modulos, RSS-OSINT, scoring cinetico, suelos base |
-| Dashboard V1.0 | 8 tabs, precio petroleo RT, mapa incidentes, cyber timeline |
-            """)
+- OSINT multi-fuente
+- Scoring por vocabulario especializado
+- Alertas automaticas por titulares de alta severidad
+""")
 
         with doc_download:
-            st.subheader("Documentacion Descargable")
-            st.divider()
-            c1, c2 = st.columns(2)
+            st.download_button(
+                "Descargar CSV Historico",
+                export_csv_atlas(df_history),
+                "sieg_atlas_history.csv",
+                "text/csv"
+            )
 
-            with c1:
-                st.markdown("#### 📘 Guia de Usuario (PDF)")
-                st.caption("Metodologia, niveles, glosario ES+EN, FAQ — ambos proyectos")
-                try:
-                    pdf_path = os.path.join(BASE_DIR, "docs", "user_guide.pdf")
-                    if os.path.exists(pdf_path):
-                        with open(pdf_path, "rb") as fh:
-                            st.download_button(
-                                label="⬇ Descargar user_guide.pdf",
-                                data=fh.read(),
-                                file_name="SIEG_user_guide.pdf",
-                                mime="application/pdf",
-                            )
-                    else:
-                        st.info("Coloca docs/user_guide.pdf en el repo para activar descarga.")
-                except Exception:
-                    st.info("Coloca docs/user_guide.pdf en el repo para activar descarga.")
-                st.markdown("[Ver en GitHub →](https://github.com/mcasrom/SIEG-Atlas/blob/main/docs/user_guide.pdf)")
-
-            with c2:
-                st.markdown("#### 🔧 Referencia Tecnica (Markdown)")
-                st.caption("Arquitectura, algoritmos, changelog Atlas para desarrolladores")
-                try:
-                    md_path = os.path.join(BASE_DIR, "docs", "technical_reference.md")
-                    if os.path.exists(md_path):
-                        with open(md_path, "r") as fh:
-                            md_bytes = fh.read().encode("utf-8")
-                        st.download_button(
-                            label="⬇ Descargar technical_reference.md",
-                            data=md_bytes,
-                            file_name="SIEG_Atlas_technical_reference.md",
-                            mime="text/markdown",
-                        )
-                    else:
-                        st.info("Coloca docs/technical_reference.md en el repo para activar descarga.")
-                except Exception:
-                    st.info("Coloca docs/technical_reference.md en el repo para activar descarga.")
-                st.markdown("[Ver en GitHub →](https://github.com/mcasrom/SIEG-Atlas/blob/main/docs/technical_reference.md)")
-
-            st.divider()
-            st.markdown("#### 🌐 Documentacion Web")
-            st.markdown("[mcasrom.github.io/SIEG-Core →](https://mcasrom.github.io/SIEG-Core/)")
-            st.markdown("[SIEG Core →](https://sieg-intelligence-radar.streamlit.app)")
-
-    st.markdown(f"""
-    <div class='sieg-footer'>
-        \U0001f30e S.I.E.G. ATLAS {APP_VERSION} &nbsp;&middot;&nbsp;
-        Infraestructura Critica Global &nbsp;&middot;&nbsp;
-        Scanner V1.2 autolearning<br>
-        &copy; {BUILD_DATE} <b>M. Castillo</b> &nbsp;&middot;&nbsp;
-        <a href='mailto:mybloggingnotes@gmail.com'>mybloggingnotes@gmail.com</a>
-        &nbsp;&middot;&nbsp; Nodo: Odroid-C2 / DietPi
-    </div>
-    """, unsafe_allow_html=True)
-
-
+# ---------------------------------------------------------------
+# MAIN
+# ---------------------------------------------------------------
 if __name__ == "__main__":
     main()

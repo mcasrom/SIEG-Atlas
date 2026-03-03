@@ -427,7 +427,7 @@ def render_gauge_grid(modulos: list, trends: dict) -> None:
                 margin=dict(t=50, b=10, l=10, r=10),
                 paper_bgcolor="#080a10",
             )
-            st.plotly_chart(fig, use_container_width=True,
+            st.plotly_chart(fig, width="stretch",
                             config={"displayModeBar": False})
 
             st.markdown(
@@ -521,7 +521,7 @@ def render_incident_map(modulos: list, selected_mod: str) -> None:
         margin=dict(t=10, b=10, l=0, r=0),
         height=380,
     )
-    st.plotly_chart(fig, use_container_width=True,
+    st.plotly_chart(fig, width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -556,7 +556,7 @@ def render_cyber_timeline(df: pd.DataFrame) -> None:
         margin=dict(t=20, b=20, l=10, r=10),
         height=320,
     )
-    st.plotly_chart(fig, use_container_width=True,
+    st.plotly_chart(fig, width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -644,7 +644,7 @@ def render_comparative(df: pd.DataFrame) -> None:
         margin=dict(t=20, b=20, l=10, r=10),
         height=360,
     )
-    st.plotly_chart(fig, use_container_width=True,
+    st.plotly_chart(fig, width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -679,7 +679,7 @@ def render_module_detail(modulo: dict, df: pd.DataFrame) -> None:
             margin=dict(t=10, b=10, l=10, r=10),
             height=260,
         )
-        st.plotly_chart(fig, use_container_width=True,
+        st.plotly_chart(fig, width="stretch",
                         config={"displayModeBar": False})
         st.caption(
             f"Min: {df_m['score'].min():.0f}% · "
@@ -772,7 +772,7 @@ def main() -> None:
         st.dataframe(
             pd.DataFrame(rows),
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
             column_config={
                 "Score %": st.column_config.ProgressColumn(
                     "Score %", min_value=0, max_value=100, format="%d%%"
@@ -834,7 +834,7 @@ def main() -> None:
                 margin=dict(t=10, b=10, l=10, r=10),
                 height=300,
             )
-            st.plotly_chart(fig, use_container_width=True,
+            st.plotly_chart(fig, width="stretch",
                             config={"displayModeBar": False})
 
     with tab_maritime:
@@ -884,97 +884,57 @@ def main() -> None:
             "📄 Descargar",
         ])
 
+    with tab_docs:
+        doc_user, doc_tech, doc_download = st.tabs([
+            "📘 Guia de Usuario",
+            "🔧 Referencia Tecnica",
+            "📄 Descargar",
+        ])
+
         with doc_user:
             st.markdown("""
-## S.I.E.G. Atlas — Guia de Usuario
+## Guia de Usuario — S.I.E.G. Atlas
 
-**SIEG Atlas** monitoriza seis ejes de infraestructura crítica global mediante análisis
+SIEG Atlas monitoriza seis ejes de infraestructura critica global mediante analisis
 de fuentes RSS abiertas. Scores 0-100% actualizados cada 60 minutos.
 
----
-
 ### Ejes Monitorizados
-
-| Eje | Score base | Descripcion |
-|-----|-----------|-------------|
-| 🛢 Petroleo & Gas | 35% | Precios, OPEC, embargos, rutas suministro |
-| ⚓ Rutas Maritimas | 45% | Houthi, Mar Rojo, estrechos criticos |
-| 🔌 Cables Submarinos | 15% | Incidentes fibra optica submarina |
-| 🌊 Mar de China | 42% | Taiwan Strait, Spratly, PLA Navy |
-| 🛰 Espacio | 20% | ASAT, debris orbital, satelites militares |
-| 💻 Cibergeopolitica | 33% | APT estatales, infraestructura critica |
-
----
+- Petroleo & Gas
+- Rutas Maritimas
+- Cables Submarinos
+- Mar de China
+- Espacio
+- Cibergeopolitica
 
 ### Niveles de Alerta
-
-| Score | Nivel | Descripcion |
-|-------|-------|-------------|
-| >= 80% | 🔴 CRITICO | Riesgo inmediato para infraestructura |
-| 60-79% | 🟠 ALTO | Incidentes activos o amenaza sostenida |
-| 40-59% | 🟡 MEDIO | Tension elevada sin incidente confirmado |
-| < 40%  | 🟢 NORMAL | Situacion monitorizada |
-
----
-
-### Calidad de Fuentes
-
-| Badge | Noticias | Significado |
-|-------|----------|-------------|
-| 🟢 VERDE | >= 60 | Cobertura optima |
-| 🔵 AZUL | >= 40 | Cobertura aceptable (minimo) |
-| 🟡 AMARILLO | 25-39 | Cobertura reducida |
-| 🟠 NARANJA | 10-24 | Cobertura critica |
-| 🔴 ROJO | < 10 | Sin cobertura — solo suelo base |
-
-`[FB]` = fuentes alternativas fallback &nbsp;|&nbsp; `[WEB]` = Google News RSS (capa 3)
-
----
-
-### Tabs del Dashboard
-
-- **Overview** — 6 gauges con badge de calidad + tabla resumen + exportar CSV
-- **Petroleo** — Precio Brent/WTI en tiempo real + historico de tension
-- **Maritimo** — Estado de 5 estrechos criticos + alertas activas
-- **Cyber** — Timeline de actividad APT + alertas
-- **Mapa** — Puntos calientes geograficos por eje seleccionado
-- **Comparativa** — Evolucion multi-eje con umbrales de alerta
-- **Por Modulo** — Detalle individual con metricas y estadisticas
-
----
-
-### Limitaciones
-
-- El sistema NO verifica la veracidad de noticias individuales
-- Un score alto = frecuencia de cobertura conflictiva, no confirmacion de hechos
-- El precio del petroleo (Yahoo Finance) tiene ~15min de diferido
-
-*EN: The system does NOT verify news veracity. Oil price has ~15min delay.*
-
----
-
-### Glosario
-
-| Termino | ES | EN |
-|---------|----|----|
-| OSINT | Inteligencia fuentes abiertas | Open Source Intelligence |
-| CF | Coeficiente de Fiabilidad (0-1) | Reliability Coefficient |
-| APT | Amenaza Persistente Avanzada | Advanced Persistent Threat |
-| ASAT | Arma antisatelite | Anti-satellite weapon |
-| FONOP | Libertad de navegacion | Freedom of Navigation Operation |
-| Houthi | Milicia Yemen-Houthi | Houthi rebel group (Yemen) |
-| Brent | Petroleo crudo referencia europea | European crude oil benchmark |
-| WTI | West Texas Intermediate (USA) | US crude oil benchmark |
-| OPEC | Org. Paises Exportadores Petroleo | Organization of Petroleum Exporting Countries |
-| PLA | Ejercito Popular Liberacion China | People's Liberation Army |
+- Critico: >= 80%
+- Alto: 60-79%
+- Medio: 40-59%
+- Normal: < 40%
 """)
 
         with doc_tech:
             st.markdown("""
-## Referencia Tecnica — SIEG Atlas
+## Referencia Tecnica — S.I.E.G. Atlas
 
-**Scanner V1.2 · Dashboard V1.0 · Odroid-C2 · DietPi**
-
----
+Scanner V1.2 · Dashboard V1.1 · Odroid-C2 · DietPi
 
 ### Arquitectura
+- OSINT multi-fuente
+- Scoring por vocabulario especializado
+- Alertas automaticas por titulares de alta severidad
+""")
+
+        with doc_download:
+            st.download_button(
+                "Descargar CSV Historico",
+                export_csv_atlas(df_history),
+                "sieg_atlas_history.csv",
+                "text/csv"
+            )
+
+# ---------------------------------------------------------------
+# MAIN
+# ---------------------------------------------------------------
+if __name__ == "__main__":
+    main()
