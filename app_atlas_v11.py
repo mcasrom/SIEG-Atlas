@@ -1,0 +1,931 @@
+"""
+S.I.E.G. ATLAS - Geopolitical Infrastructure Dashboard V1.1
+Novedades vs V1.0:
+  - Flash News: ticker horizontal animado en cabecera (color azul tema Atlas)
+  - Panel Flash en sidebar (8 mas recientes, badge NEW < 24h)
+  - load_flashes() con purga TTL 48h integrada
+  - render_flash_ticker() y render_flash_sidebar() estilo Atlas
+Ejes: Petroleo | Maritimo | Cables | MarChina | Espacio | Ciber
+"""
+
+import json
+import logging
+import os
+import time
+from datetime import datetime
+
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+import requests
+import streamlit as st
+
+# ---------------------------------------------------------------------------
+# CONFIGURACION
+# ---------------------------------------------------------------------------
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+DATA_LIVE    = os.path.join(BASE_DIR, "data", "live")
+HISTORY_CSV  = os.path.join(DATA_LIVE, "history_atlas.csv")
+FLASHES_FILE = os.path.join(DATA_LIVE, "atlas_flashes.json")
+
+APP_VERSION  = "V1.1"
+BUILD_DATE   = "2026"
+FLASH_TTL_H  = 48
+
+MODULOS = ["Petroleo", "Maritimo", "Cables", "MarChina", "Espacio", "Ciber"]
+
+MODULO_DISPLAY = {
+    "Petroleo":  "🛢 Petroleo & Gas",
+    "Maritimo":  "⚓ Rutas Maritimas",
+    "Cables":    "🔌 Cables Submarinos",
+    "MarChina":  "🌊 Mar de China",
+    "Espacio":   "🛰 Espacio",
+    "Ciber":     "💻 Cibergeopolitica",
+}
+
+MODULO_DESC = {
+    "Petroleo":  "Precios, rutas de suministro, OPEC, embargos y ataques a infraestructura energetica.",
+    "Maritimo":  "Estrechos criticos (Hormuz, Suez, Malacca), incidentes navales y bloqueos.",
+    "Cables":    "Incidentes en cables submarinos de fibra optica e infraestructura de internet.",
+    "MarChina":  "Disputas territoriales, incidentes navales y tension en el Indo-Pacifico.",
+    "Espacio":   "Lanzamientos militares, tests ASAT, debris orbital y carrera espacial.",
+    "Ciber":     "Alertas APT, ataques a infraestructura critica y actores estatales.",
+}
+
+MODULO_COORDS = {
+    "Petroleo":  [(26.0,  56.0, "Golfo Persico"),
+                  (25.0,  37.0, "Mar Rojo"),
+                  (29.0,  48.0, "Kuwait/Iraq"),
+                  (56.0,  44.0, "Rusia/Gas"),
+                  (4.0,    6.0, "Nigeria/Delta")],
+    "Maritimo":  [(26.5,  56.3, "Estrecho de Hormuz"),
+                  (12.5,  43.5, "Bab el-Mandeb"),
+                  (30.5,  32.3, "Canal de Suez"),
+                  (1.3,  103.8, "Estrecho de Malacca"),
+                  (22.3, 114.1, "Mar de China Meridional")],
+    "Cables":    [(37.0,  25.0, "Mediterraneo"),
+                  (51.5,  -0.1, "Atlantico Norte"),
+                  (35.0, 139.0, "Pacifico"),
+                  (1.3,  103.8, "SE Asia Hub"),
+                  (-34.0,-18.0, "Atlantico Sur")],
+    "MarChina":  [(15.0, 114.0, "Mar de China Meridional"),
+                  (24.5, 122.0, "Estrecho de Taiwan"),
+                  (10.0, 109.0, "Islas Spratly"),
+                  (16.5, 112.3, "Islas Paracel"),
+                  (20.0, 121.0, "Luzon Strait")],
+    "Espacio":   [(28.5, -80.6, "Cabo Canaveral"),
+                  (45.6,  63.3, "Baikonur"),
+                  (19.6, 110.9, "Wenchang"),
+                  (5.2,  -52.8, "Kourou"),
+                  (30.4, 130.9, "Tanegashima")],
+    "Ciber":     [(38.9, -77.0, "CISA/EEUU"),
+                  (52.5,  13.4, "BSI/Alemania"),
+                  (51.5,  -0.1, "NCSC/UK"),
+                  (55.7,  37.6, "APT/Rusia"),
+                  (39.9, 116.4, "APT/China")],
+}
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# CSS
+# ---------------------------------------------------------------------------
+ATLAS_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+.stApp { background-color: #080a10; color: #00ccff; }
+.block-container { max-width: 98% !important; padding-top: 3.5rem; }
+
+h1, h2, h3 { color: #00ccff !important; font-family: 'Share Tech Mono', monospace; }
+
+.stTabs [data-baseweb="tab-list"] { background-color: #0a0f1a; border-bottom: 1px solid #00ccff; }
+.stTabs [data-baseweb="tab"] { color: #0077aa; font-family: monospace; }
+.stTabs [aria-selected="true"] { color: #00ccff !important; border-bottom: 2px solid #00ccff !important; }
+
+.atlas-hero {
+    border: 1px solid #00ccff; border-top: 3px solid #00ccff;
+    background: linear-gradient(180deg, #080f1a 0%, #080a10 100%);
+    padding: 16px 22px; border-radius: 6px; margin-bottom: 18px;
+    font-family: 'Share Tech Mono', monospace;
+}
+.atlas-version { color: #00ccff; font-size: 0.72em; letter-spacing: 0.15em; opacity: 0.7; margin-bottom: 5px; }
+.atlas-timestamp { color: #0099cc; font-size: 1.0em; font-weight: bold; margin-bottom: 8px; }
+.atlas-desc { color: #aaccff; font-size: 0.80em; line-height: 1.8;
+    border-top: 1px solid #0a2a3a; padding-top: 8px; }
+.atlas-desc span { color: #00ccff; font-weight: bold; }
+
+.alert-box {
+    background: #0a1020; border-left: 3px solid #ff4400;
+    padding: 8px 14px; margin: 4px 0; border-radius: 3px;
+    font-family: monospace; font-size: 0.82em; color: #ffaa88;
+}
+.module-card {
+    background: #0a0f1a; border: 1px solid #0a2a3a;
+    border-radius: 6px; padding: 12px; margin-bottom: 8px;
+    font-family: monospace;
+}
+.quality-badge {
+    display: inline-block; font-family: monospace;
+    font-size: 0.72em; padding: 2px 8px; border-radius: 10px;
+    margin-top: 3px; letter-spacing: 0.08em;
+}
+.quality-green  { background: #0a2a0a; color: #00ff41; border: 1px solid #00ff41; }
+.quality-blue   { background: #0a1a2a; color: #00ccff; border: 1px solid #00ccff; }
+.quality-yellow { background: #2a2a00; color: #ffdd00; border: 1px solid #ffdd00; }
+.quality-orange { background: #2a1a00; color: #ff8800; border: 1px solid #ff8800; }
+.quality-red    { background: #2a0000; color: #ff2222; border: 1px solid #ff2222; }
+
+.sieg-footer {
+    border-top: 1px solid #0a2a3a; margin-top: 30px;
+    padding: 16px 0 8px 0; text-align: center;
+    font-family: monospace; font-size: 0.78em; color: #336688;
+    line-height: 2.2;
+}
+.sieg-footer a { color: #00ccff; text-decoration: none; }
+.sieg-footer a:hover { text-decoration: underline; }
+
+/* ── FLASH TICKER Atlas ──────────────────────────────────── */
+.flash-ticker-wrap {
+    background: #000d1a;
+    border-top: 1px solid #0055cc;
+    border-bottom: 1px solid #0055cc;
+    overflow: hidden;
+    position: relative;
+    height: 36px;
+    margin-bottom: 14px;
+}
+.flash-ticker-label {
+    position: absolute; left: 0; top: 0;
+    background: #0055cc; color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75em; font-weight: bold;
+    padding: 0 12px; height: 36px; line-height: 36px;
+    z-index: 2; letter-spacing: 0.12em; white-space: nowrap;
+}
+.flash-ticker-track {
+    display: inline-block;
+    white-space: nowrap;
+    animation: ticker-scroll 55s linear infinite;
+    padding-left: 120px;
+    line-height: 36px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.82em;
+    color: #aaccff;
+}
+.flash-ticker-track:hover { animation-play-state: paused; }
+@keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+.flash-item-ticker { margin-right: 60px; color: #cce4ff; }
+.flash-item-ticker b { color: #66aaff; }
+
+/* ── FLASH SIDEBAR Atlas ──────────────────────────────────── */
+.flash-sidebar-item {
+    background: #050d1a;
+    border-left: 3px solid #0055cc;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    border-radius: 0 4px 4px 0;
+    font-family: monospace;
+    font-size: 0.78em;
+    color: #aaccff;
+    line-height: 1.5;
+}
+.flash-sidebar-ts { color: #334466; font-size: 0.82em; }
+.flash-new-badge {
+    background: #0055cc; color: #fff;
+    font-size: 0.65em; padding: 1px 5px;
+    border-radius: 3px; margin-left: 4px;
+    vertical-align: middle; font-weight: bold;
+}
+</style>
+"""
+
+# ---------------------------------------------------------------------------
+# PRECIO PETROLEO
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=300)
+def fetch_oil_price() -> dict:
+    try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/BZ=F?interval=1d&range=5d"
+        r   = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+        data  = r.json()
+        price = data["chart"]["result"][0]["meta"]["regularMarketPrice"]
+        prev  = data["chart"]["result"][0]["meta"]["chartPreviousClose"]
+        delta = price - prev
+        return {"brent": round(price, 2), "delta": round(delta, 2), "ok": True}
+    except Exception:
+        pass
+    try:
+        url2 = "https://query1.finance.yahoo.com/v8/finance/chart/CL=F?interval=1d&range=5d"
+        r    = requests.get(url2, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+        data  = r.json()
+        price = data["chart"]["result"][0]["meta"]["regularMarketPrice"]
+        prev  = data["chart"]["result"][0]["meta"]["chartPreviousClose"]
+        return {"wti": round(price, 2), "delta": round(price - prev, 2), "ok": True}
+    except Exception:
+        return {"ok": False}
+
+# ---------------------------------------------------------------------------
+# CARGA DE DATOS
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=180)
+def load_modulo(modulo: str) -> dict:
+    path = os.path.join(DATA_LIVE, f"atlas_{modulo.lower()}.json")
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {"modulo": modulo, "score": 0, "alertas": [],
+                "noticias": 0, "timestamp": 0, "version": "?",
+                "calidad_nivel": "ROJO", "calidad_emoji": "🔴",
+                "calidad_css": "red", "fuentes_activas": 0,
+                "uso_fallback": False, "uso_web": False}
+
+
+@st.cache_data(ttl=180)
+def load_all_modulos() -> list:
+    result = []
+    for m in MODULOS:
+        d = load_modulo(m)
+        result.append({
+            "key":             m,
+            "display":         MODULO_DISPLAY.get(m, m),
+            "score":           float(d.get("score", 0)),
+            "alertas":         d.get("alertas", []),
+            "noticias":        int(d.get("noticias", 0)),
+            "timestamp":       float(d.get("timestamp", 0)),
+            "calidad_nivel":   d.get("calidad_nivel", "ROJO"),
+            "calidad_emoji":   d.get("calidad_emoji", "🔴"),
+            "calidad_css":     d.get("calidad_css", "red"),
+            "fuentes_activas": int(d.get("fuentes_activas", 0)),
+            "uso_fallback":    bool(d.get("uso_fallback", False)),
+            "uso_web":         bool(d.get("uso_web", False)),
+        })
+    return sorted(result, key=lambda x: x["score"], reverse=True)
+
+
+@st.cache_data(ttl=180)
+def load_history() -> pd.DataFrame:
+    if not os.path.exists(HISTORY_CSV):
+        return pd.DataFrame(columns=["timestamp", "modulo", "score", "dt"])
+    try:
+        df = pd.read_csv(HISTORY_CSV, header=None,
+                         names=["timestamp", "modulo", "score"])
+        df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce")
+        df = df.dropna(subset=["timestamp"])
+        df["score"]  = pd.to_numeric(df["score"], errors="coerce").fillna(0)
+        df["modulo"] = df["modulo"].str.strip()
+        df["dt"]     = pd.to_datetime(df["timestamp"], unit="s")
+        return df.sort_values("dt")
+    except Exception as e:
+        logger.error("Error cargando historico: %s", e)
+        return pd.DataFrame(columns=["timestamp", "modulo", "score", "dt"])
+
+
+@st.cache_data(ttl=60)
+def load_flashes() -> list:
+    """Carga flashes desde JSON con purga TTL integrada."""
+    if not os.path.exists(FLASHES_FILE):
+        return []
+    try:
+        with open(FLASHES_FILE) as f:
+            flashes = json.load(f)
+        ahora = time.time()
+        ttl_s = FLASH_TTL_H * 3600
+        return [fl for fl in flashes if (ahora - fl.get("ts", 0)) < ttl_s]
+    except (OSError, json.JSONDecodeError):
+        return []
+
+# ---------------------------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------------------------
+
+def score_color_atlas(score: float) -> str:
+    if score >= 70: return "#ff2222"
+    if score >= 50: return "#ff8800"
+    if score >= 30: return "#ffdd00"
+    return "#00ccff"
+
+def score_label_atlas(score: float) -> str:
+    if score >= 70: return "CRITICO"
+    if score >= 50: return "ALTO"
+    if score >= 30: return "MEDIO"
+    return "NORMAL"
+
+def compute_trends(df: pd.DataFrame, modulos: list) -> dict:
+    trends = {}
+    for m in modulos:
+        s = df[df["modulo"] == m["key"]].sort_values("timestamp", ascending=False)["score"]
+        trends[m["key"]] = float(s.iloc[0]) - float(s.iloc[1]) if len(s) >= 2 else 0.0
+    return trends
+
+def export_csv_atlas(df: pd.DataFrame) -> bytes:
+    return df[["dt", "modulo", "score"]].rename(columns={
+        "dt": "datetime", "modulo": "module", "score": "score_pct"
+    }).to_csv(index=False).encode("utf-8")
+
+# ---------------------------------------------------------------------------
+# FLASH COMPONENTS
+# ---------------------------------------------------------------------------
+
+def render_flash_ticker(flashes: list) -> None:
+    """Ticker horizontal animado en cabecera — tema azul Atlas."""
+    if not flashes:
+        return
+    items_html = ""
+    for fl in flashes:
+        modulo = fl.get("modulo", "")
+        icono  = fl.get("icono", "🔴")
+        titulo = fl.get("titulo", "")[:100]
+        score  = fl.get("score", 0)
+        items_html += (
+            f'<span class="flash-item-ticker">'
+            f'&nbsp;&nbsp;{icono}&nbsp;<b>[{modulo} &middot; {score}%]</b>'
+            f'&nbsp;{titulo}&nbsp;&nbsp;&#9646;'
+            f'</span>'
+        )
+    track = items_html * 2
+    st.markdown(
+        f'<div class="flash-ticker-wrap">'
+        f'<div class="flash-ticker-label">⚡ FLASH</div>'
+        f'<div class="flash-ticker-track">{track}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_flash_sidebar(flashes: list) -> None:
+    """Panel de flashes en sidebar — tema azul Atlas."""
+    if not flashes:
+        st.markdown(
+            "<div style='font-family:monospace;font-size:0.78em;color:#223344'>"
+            "Sin eventos flash activos</div>",
+            unsafe_allow_html=True,
+        )
+        return
+    ahora  = time.time()
+    recent = sorted(flashes, key=lambda x: x.get("ts", 0), reverse=True)[:8]
+    for fl in recent:
+        age_h  = (ahora - fl.get("ts", 0)) / 3600
+        badge  = '<span class="flash-new-badge">NEW</span>' if age_h < 24 else ""
+        modulo = fl.get("modulo", "")
+        icono  = fl.get("icono", "🔴")
+        titulo = fl.get("titulo", "")[:90]
+        score  = fl.get("score", 0)
+        ts_str = datetime.fromtimestamp(fl.get("ts", ahora)).strftime("%d/%m %H:%M")
+        st.markdown(
+            f'<div class="flash-sidebar-item">'
+            f'{icono} <b>{modulo}</b> [{score}%]{badge}<br>'
+            f'{titulo}<br>'
+            f'<span class="flash-sidebar-ts">{ts_str}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+# ---------------------------------------------------------------------------
+# COMPONENTES UI
+# ---------------------------------------------------------------------------
+
+def render_hero(modulos: list, df: pd.DataFrame) -> None:
+    now_str    = datetime.now().strftime("%d-%m-%Y %H:%M:%S UTC")
+    ts_vals    = [m["timestamp"] for m in modulos if m["timestamp"] > 0]
+    signal_str = datetime.fromtimestamp(max(ts_vals)).strftime("%d-%m-%Y %H:%M:%S") if ts_vals else "SIN SENAL"
+    records    = len(df)
+    n_alertas  = sum(len(m["alertas"]) for m in modulos)
+
+    st.markdown(f"""
+    <div class='atlas-hero'>
+        <div class='atlas-version'>
+            S.I.E.G. ATLAS {APP_VERSION} &nbsp;|&nbsp;
+            6 Ejes Geopoliticos &nbsp;|&nbsp;
+            Ciclo: 60 min &nbsp;|&nbsp;
+            Nodo: Odroid-C2 / DietPi
+        </div>
+        <div class='atlas-timestamp'>
+            📡 ULTIMA SENAL: {signal_str} &nbsp;|&nbsp;
+            📊 REGISTROS: {records:,} &nbsp;|&nbsp;
+            🚨 ALERTAS ACTIVAS: {n_alertas} &nbsp;|&nbsp;
+            🕐 {now_str}
+        </div>
+        <div class='atlas-desc'>
+            <span>[ MISION ]</span>
+            Monitorizacion de infraestructura critica global: energia, rutas maritimas,
+            cables submarinos, espacio y ciberespacio.<br>
+            <span>[ EJES ]</span>
+            Petroleo & Gas · Rutas Maritimas · Cables Submarinos ·
+            Mar de China · Espacio · Cibergeopolitica.<br>
+            <span>[ FLASH ]</span>
+            Eventos criticos extraidos automaticamente · TTL 48h · Ticker + Sidebar.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_gauge_grid(modulos: list, trends: dict) -> None:
+    cols = st.columns(3)
+    for i, m in enumerate(modulos):
+        with cols[i % 3]:
+            delta = trends.get(m["key"], 0.0)
+            color = score_color_atlas(m["score"])
+            nivel = score_label_atlas(m["score"])
+            arrow = f"+{delta:.0f}" if delta > 0 else f"{delta:.0f}"
+
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=m["score"],
+                gauge={
+                    "axis": {"range": [0, 100],
+                             "tickcolor": "#00ccff",
+                             "tickfont": {"color": "#00ccff", "size": 8}},
+                    "bar":  {"color": color},
+                    "bgcolor": "#0a0f1a",
+                    "bordercolor": "#0a2a3a",
+                    "steps": [
+                        {"range": [0,  30], "color": "#080a10"},
+                        {"range": [30, 50], "color": "#0a1410"},
+                        {"range": [50, 70], "color": "#1a1000"},
+                        {"range": [70,100], "color": "#1a0000"},
+                    ],
+                },
+                number={"font": {"color": "#00ccff", "size": 30}, "suffix": "%"},
+                title={"text": m["display"], "font": {"color": "#aaccff", "size": 11}},
+            ))
+            fig.update_layout(
+                height=190, margin=dict(t=50, b=10, l=10, r=10),
+                paper_bgcolor="#080a10",
+            )
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+            st.markdown(
+                f"<div style='text-align:center;font-family:monospace;"
+                f"font-size:0.75em;color:#aaccff'>"
+                f"{arrow:>5} &nbsp; <b>{nivel}</b> &nbsp; "
+                f"{m['noticias']} fuentes</div>"
+                f"<div style='text-align:center;margin-top:3px'>"
+                f"<span class='quality-badge quality-{m.get('calidad_css','red')}'>"
+                f"{m.get('calidad_emoji','🔴')} {m.get('calidad_nivel','ROJO')}"
+                f"{'  FB' if m.get('uso_fallback') else ''}"
+                f"{'  WEB' if m.get('uso_web') else ''}"
+                f"</span></div>",
+                unsafe_allow_html=True,
+            )
+            for alerta in m["alertas"][:2]:
+                st.markdown(
+                    f"<div class='alert-box'>↳ {alerta[:90]}</div>",
+                    unsafe_allow_html=True,
+                )
+
+
+def render_oil_panel() -> None:
+    st.subheader("🛢 Precio del Petroleo — Tiempo Real")
+    oil = fetch_oil_price()
+    c1, c2, c3 = st.columns(3)
+    if oil.get("ok"):
+        brent = oil.get("brent") or oil.get("wti", 0)
+        delta = oil.get("delta", 0)
+        label = "Brent" if "brent" in oil else "WTI"
+        c1.metric(f"{label} (USD/barril)", f"${brent}", f"{delta:+.2f}")
+        c2.metric("Tendencia", "📈 ALZA" if delta > 0 else "📉 BAJA",
+                  f"{abs(delta):.2f} vs cierre anterior")
+        c3.metric("Nivel de alerta energetica",
+                  "⚠ ELEVADO" if brent > 90 else "✅ NORMAL",
+                  "Umbral: $90/barril")
+    else:
+        st.warning("API de precio no disponible.")
+    st.caption("Fuente: Yahoo Finance (datos diferidos ~15 min)")
+
+
+def render_incident_map(modulos: list, selected_mod: str) -> None:
+    coords = MODULO_COORDS.get(selected_mod, [])
+    if not coords:
+        st.info("Sin coordenadas para este modulo.")
+        return
+    mod_data   = next((m for m in modulos if m["key"] == selected_mod), None)
+    base_score = mod_data["score"] if mod_data else 30
+    rows = [{"lat": lat, "lon": lon, "nombre": nombre,
+             "score": base_score, "size": max(base_score * 0.6, 8)}
+            for lat, lon, nombre in coords]
+    df_map = pd.DataFrame(rows)
+    fig = px.scatter_geo(
+        df_map, lat="lat", lon="lon", size="size", color="score",
+        color_continuous_scale=[[0.0, "#00ccff"], [0.5, "#ff8800"], [1.0, "#ff0000"]],
+        range_color=[0, 100],
+        hover_name="nombre",
+        hover_data={"score": True, "lat": False, "lon": False, "size": False},
+        projection="natural earth",
+    )
+    fig.update_layout(
+        paper_bgcolor="#080a10",
+        geo=dict(bgcolor="#080a10", landcolor="#0a0f1a", oceancolor="#05080f",
+                 showocean=True, showland=True, showcountries=True,
+                 countrycolor="#0a2a3a", coastlinecolor="#0a2a3a", framecolor="#00ccff"),
+        coloraxis_colorbar=dict(tickfont={"color": "#00ccff"},
+                                title=dict(text="Score", font={"color": "#00ccff"})),
+        margin=dict(t=10, b=10, l=0, r=0), height=380,
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_cyber_timeline(df: pd.DataFrame) -> None:
+    df_c = df[df["modulo"] == "Ciber"].sort_values("dt")
+    if df_c.empty:
+        st.info("Sin datos historicos de Ciber.")
+        return
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df_c["dt"], y=df_c["score"],
+        mode="lines+markers", fill="tozeroy",
+        fillcolor="rgba(0,100,255,0.08)",
+        line=dict(color="#00ccff", width=2),
+        marker=dict(size=5, color="#00ccff"),
+        name="Score Ciber",
+        hovertemplate="%{x}<br>Score: %{y}%<extra></extra>",
+    ))
+    fig.add_hline(y=70, line_dash="dot", line_color="#ff2222",
+                  annotation_text="CRITICO", annotation_font_color="#ff2222")
+    fig.add_hline(y=50, line_dash="dot", line_color="#ff8800",
+                  annotation_text="ALTO", annotation_font_color="#ff8800")
+    fig.update_layout(
+        paper_bgcolor="#080a10", plot_bgcolor="#080a10", font_color="#00ccff",
+        xaxis=dict(gridcolor="#0a2a3a", tickfont={"color": "#aaccff"}),
+        yaxis=dict(range=[0, 105], gridcolor="#0a2a3a", tickfont={"color": "#aaccff"}),
+        margin=dict(t=20, b=20, l=10, r=10), height=320,
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_maritime_alerts(modulos: list) -> None:
+    mar = next((m for m in modulos if m["key"] == "Maritimo"), None)
+    if not mar:
+        return
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        nivel = score_label_atlas(mar["score"])
+        color = score_color_atlas(mar["score"])
+        st.markdown(f"""
+        <div style='background:#0a0f1a;border:1px solid {color};border-radius:6px;
+                    padding:20px;text-align:center;font-family:monospace;'>
+            <div style='color:#aaccff;font-size:0.8em;margin-bottom:8px'>NIVEL DE RIESGO MARITIMO</div>
+            <div style='color:{color};font-size:2.5em;font-weight:bold'>{mar["score"]}%</div>
+            <div style='color:{color};font-size:1em;margin-top:5px'>{nivel}</div>
+            <div style='color:#aaccff;font-size:0.75em;margin-top:10px'>{mar["noticias"]} fuentes</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown("**Estrechos criticos monitorizados:**")
+        estrechos = [
+            ("🔴 Estrecho de Hormuz", "20% trafico mundial de petroleo"),
+            ("🟡 Bab el-Mandeb",      "Acceso al Canal de Suez / Mar Rojo"),
+            ("🟢 Canal de Suez",      "12% comercio maritimo global"),
+            ("🟢 Estrecho de Malacca","Ruta Asia-Europa / energia"),
+            ("🟡 Mar de China Sur",   "Disputa territorial activa"),
+        ]
+        for nombre, desc in estrechos:
+            st.markdown(f"**{nombre}** — {desc}")
+        if mar["alertas"]:
+            st.divider()
+            st.markdown("**Alertas activas:**")
+            for a in mar["alertas"]:
+                st.markdown(f"<div class='alert-box'>⚠ {a[:110]}</div>",
+                            unsafe_allow_html=True)
+
+
+def render_comparative(df: pd.DataFrame) -> None:
+    if df.empty:
+        return
+    palette = ["#00ccff","#ff8800","#00ff41","#ff2222","#ffdd00","#ff44aa"]
+    fig = go.Figure()
+    for idx, m in enumerate(MODULOS):
+        df_m = df[df["modulo"] == m].sort_values("dt")
+        if df_m.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=df_m["dt"], y=df_m["score"], mode="lines",
+            name=MODULO_DISPLAY.get(m, m),
+            line=dict(color=palette[idx % len(palette)], width=2),
+            hovertemplate="%{fullData.name}<br>%{x}<br>%{y}%<extra></extra>",
+        ))
+    fig.add_hline(y=70, line_dash="dot", line_color="#ff2222",
+                  annotation_text="CRITICO", annotation_font_color="#ff2222", annotation_font_size=9)
+    fig.add_hline(y=50, line_dash="dot", line_color="#ff8800",
+                  annotation_text="ALTO", annotation_font_color="#ff8800", annotation_font_size=9)
+    fig.update_layout(
+        paper_bgcolor="#080a10", plot_bgcolor="#080a10", font_color="#00ccff",
+        xaxis=dict(gridcolor="#0a2a3a", tickfont={"color":"#aaccff"}),
+        yaxis=dict(range=[0,105], gridcolor="#0a2a3a", tickfont={"color":"#aaccff"}),
+        legend=dict(bgcolor="#0a0f1a", bordercolor="#0a2a3a", font={"color":"#aaccff","size":10}),
+        margin=dict(t=20, b=20, l=10, r=10), height=360,
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_module_detail(modulo: dict, df: pd.DataFrame) -> None:
+    key = modulo["key"]
+    st.markdown(f"*{MODULO_DESC.get(key, '')}*")
+    st.divider()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Score actual", f"{modulo['score']}%")
+    c2.metric("Nivel", score_label_atlas(modulo["score"]))
+    c3.metric("Fuentes procesadas", modulo["noticias"])
+    df_m = df[df["modulo"] == key].sort_values("dt")
+    if not df_m.empty:
+        fig = go.Figure(go.Scatter(
+            x=df_m["dt"], y=df_m["score"], mode="lines+markers",
+            fill="tozeroy", fillcolor="rgba(0,150,255,0.06)",
+            line=dict(color="#00ccff", width=2), marker=dict(size=4),
+        ))
+        fig.add_hline(y=70, line_dash="dot", line_color="#ff2222")
+        fig.add_hline(y=50, line_dash="dot", line_color="#ff8800")
+        fig.update_layout(
+            paper_bgcolor="#080a10", plot_bgcolor="#080a10", font_color="#00ccff",
+            xaxis=dict(gridcolor="#0a2a3a", tickfont={"color":"#aaccff"}),
+            yaxis=dict(range=[0,105], gridcolor="#0a2a3a", tickfont={"color":"#aaccff"}),
+            margin=dict(t=10, b=10, l=10, r=10), height=260,
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.caption(f"Min: {df_m['score'].min():.0f}% · Max: {df_m['score'].max():.0f}% · "
+                   f"Media: {df_m['score'].mean():.1f}% · Registros: {len(df_m)}")
+    if modulo["alertas"]:
+        st.subheader("Alertas activas")
+        for a in modulo["alertas"]:
+            st.markdown(f"<div class='alert-box'>🚨 {a}</div>", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# ENTRYPOINT
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    st.set_page_config(
+        page_title="S.I.E.G. ATLAS",
+        page_icon="🌐",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
+    st.markdown(ATLAS_CSS, unsafe_allow_html=True)
+
+    modulos    = load_all_modulos()
+    df_history = load_history()
+    trends     = compute_trends(df_history, modulos)
+    flashes    = load_flashes()
+
+    # Sidebar
+    with st.sidebar:
+        st.header("🌐 S.I.E.G. ATLAS")
+        st.caption(f"Version: {APP_VERSION}")
+        st.divider()
+        st.markdown("**Modulos activos:**")
+        for m in modulos:
+            color = score_color_atlas(m["score"])
+            st.markdown(
+                f"<span style='color:{color}'>■</span> "
+                f"{m['display']} — **{m['score']}%**",
+                unsafe_allow_html=True,
+            )
+        st.divider()
+        st.markdown("**⚡ Flash News**")
+        render_flash_sidebar(flashes)
+        st.divider()
+        st.markdown("**Proyecto relacionado:**")
+        st.markdown("[S.I.E.G. Core →](https://sieg-intelligence-radar.streamlit.app)")
+        st.code("mybloggingnotes@gmail.com", language=None)
+
+    # Cabecera
+    st.title("🌐 S.I.E.G. ATLAS — INFRASTRUCTURE INTELLIGENCE")
+    render_flash_ticker(flashes)
+    render_hero(modulos, df_history)
+
+    # Tabs principales
+    tab_overview, tab_oil, tab_maritime, tab_cyber, tab_map, tab_comparative, tab_detail, tab_docs = st.tabs([
+        "📊 Overview",
+        "🛢 Petroleo",
+        "⚓ Maritimo",
+        "💻 Ciber Timeline",
+        "🗺 Mapa",
+        "📈 Comparativa",
+        "🔍 Por Modulo",
+        "📚 Docs",
+    ])
+
+    with tab_overview:
+        st.subheader("Estado Actual — 6 Ejes Geopoliticos")
+        render_gauge_grid(modulos, trends)
+        st.divider()
+        rows = [{
+            "Modulo":   m["display"],
+            "Score %":  int(m["score"]),
+            "Nivel":    score_label_atlas(m["score"]),
+            "Calidad":  f"{m.get('calidad_emoji','🔴')} {m.get('calidad_nivel','ROJO')}",
+            "Alertas":  len(m["alertas"]),
+            "Noticias": m["noticias"],
+        } for m in modulos]
+        st.dataframe(
+            pd.DataFrame(rows),
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                "Score %": st.column_config.ProgressColumn(
+                    "Score %", min_value=0, max_value=100, format="%d%%"
+                ),
+            },
+        )
+        st.divider()
+        st.subheader("📥 Exportar Datos")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            days_exp = st.selectbox("Periodo", [7, 30, 90, 365, 0],
+                                    format_func=lambda x: f"Ultimos {x} dias" if x > 0 else "Todo",
+                                    key="atlas_exp_days")
+        with col2:
+            if not df_history.empty:
+                df_exp = df_history
+                if days_exp > 0:
+                    cutoff = pd.Timestamp.now() - pd.Timedelta(days=days_exp)
+                    df_exp = df_history[df_history["dt"] >= cutoff]
+                fname = f"sieg_atlas_{datetime.now().strftime('%Y-%m-%d')}.csv"
+                st.download_button(
+                    label=f"⬇ Descargar CSV ({len(df_exp)} filas)",
+                    data=export_csv_atlas(df_exp),
+                    file_name=fname, mime="text/csv",
+                )
+        with col3:
+            if not df_history.empty:
+                st.caption(f"Total: {len(df_history):,} registros")
+
+    with tab_oil:
+        render_oil_panel()
+
+    with tab_maritime:
+        st.subheader("⚓ Alertas Maritimas — Estrechos Criticos")
+        render_maritime_alerts(modulos)
+
+    with tab_cyber:
+        st.subheader("💻 Timeline Actividad Ciber")
+        render_cyber_timeline(df_history)
+
+    with tab_map:
+        st.subheader("🗺 Mapa de Incidentes por Eje")
+        sel_mod = st.selectbox(
+            "Seleccionar eje:",
+            options=MODULOS,
+            format_func=lambda m: MODULO_DISPLAY.get(m, m),
+        )
+        render_incident_map(modulos, sel_mod)
+
+    with tab_comparative:
+        st.subheader("📈 Evolucion Comparativa — 6 Ejes")
+        render_comparative(df_history)
+
+    with tab_detail:
+        st.subheader("🔍 Detalle por Modulo")
+        sel_display = st.selectbox(
+            "Seleccionar modulo:",
+            options=[m["display"] for m in modulos],
+        )
+        sel_modulo = next(m for m in modulos if m["display"] == sel_display)
+        render_module_detail(sel_modulo, df_history)
+
+    with tab_docs:
+        st.subheader("📚 Documentacion SIEG Atlas")
+        doc_user, doc_tech, doc_download = st.tabs(["📘 Glosario", "🔧 Ref. Tecnica", "📥 Descargar"])
+
+        with doc_user:
+            st.markdown("""
+## Glosario / Glossary
+
+| Termino | Descripcion ES | Description EN |
+|---------|----------------|----------------|
+| OSINT | Inteligencia fuentes abiertas | Open Source Intelligence |
+| CF | Coeficiente de Fiabilidad (0-1) | Reliability Coefficient |
+| APT | Amenaza Persistente Avanzada | Advanced Persistent Threat |
+| ASAT | Arma antisatelite | Anti-satellite weapon |
+| FONOP | Libertad de navegacion | Freedom of Navigation Operation |
+| Houthi | Milicia Yemen-Houthi | Houthi rebel group (Yemen) |
+| Brent | Petroleo crudo referencia europea | European crude oil benchmark |
+| WTI | West Texas Intermediate (USA) | US crude oil benchmark |
+| OPEC | Org. Paises Exportadores Petroleo | Organization of Petroleum Exporting Countries |
+| PLA | Ejercito Popular Liberacion China | People's Liberation Army |
+| Flash | Evento critico extraido automaticamente | Auto-extracted critical event |
+            """)
+
+        with doc_tech:
+            st.markdown("""
+## Referencia Tecnica — SIEG Atlas
+
+**Scanner V1.3 · Dashboard V1.1 · Odroid-C2 · DietPi**
+
+---
+
+### Arquitectura
+
+```
+SIEG-Atlas/
+├── atlas_scanner.py      Motor V1.3 (autolearning + flash)
+├── app_atlas.py          Dashboard V1.1 (flash ticker + sidebar)
+├── mapa_atlas.txt        ~30 fuentes RSS primarias
+├── update_atlas.sh       Git sync (cron: 15 * * * *)
+└── data/live/
+    ├── atlas_*.json      Score + calidad por eje
+    ├── atlas_flashes.json  Flash events TTL 48h
+    ├── history_atlas.csv   Historico activo 90 dias
+    └── atlas_learned_sources.json
+```
+
+---
+
+### Sistema Flash News (V1.3)
+
+```
+Umbral score:  55% por modulo
+TTL:           48 horas
+Max global:    15 flashes
+Max por ciclo: 3 por modulo
+Fichero:       data/live/atlas_flashes.json
+```
+
+### Triggers por Modulo
+- **Petroleo**: oil embargo, pipeline explosion, Saudi attack...
+- **Maritimo**: Hormuz closed, Suez closed, tanker seized...
+- **Cables**: submarine cable cut, internet blackout...
+- **MarChina**: Taiwan invasion, US carrier attacked...
+- **Espacio**: ASAT test, satellite destroyed, GPS disrupted...
+- **Ciber**: critical infrastructure hack, power grid attack...
+
+---
+
+### Crontab
+```
+15 * * * *  update_atlas.sh  (scanner + git push)
+ 0 2 * * 0  sieg_rotate.sh   (rotacion 90d)
+ 0 3 1 * *  sieg_backup.sh   (tar.gz mensual)
+```
+
+---
+
+### Changelog
+| Version | Cambios |
+|---------|---------|
+| Dashboard V1.1 | Flash ticker azul, sidebar flash panel |
+| Scanner V1.3 | Flash system 6 modulos x 12 triggers, TTL 48h |
+| Scanner V1.2 | Autolearning 3 capas, indicadores calidad |
+| Dashboard V1.0 | 8 tabs, precio petroleo RT, mapa incidentes |
+            """)
+
+        with doc_download:
+            st.subheader("Documentacion Descargable")
+            st.divider()
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("#### 📘 Guia de Usuario (PDF)")
+                try:
+                    pdf_path = os.path.join(BASE_DIR, "docs", "user_guide.pdf")
+                    if os.path.exists(pdf_path):
+                        with open(pdf_path, "rb") as fh:
+                            st.download_button("⬇ Descargar user_guide.pdf",
+                                               data=fh.read(),
+                                               file_name="SIEG_user_guide.pdf",
+                                               mime="application/pdf")
+                    else:
+                        st.info("Coloca docs/user_guide.pdf en el repo.")
+                except Exception:
+                    st.info("Coloca docs/user_guide.pdf en el repo.")
+                st.markdown("[Ver en GitHub →](https://github.com/mcasrom/SIEG-Atlas/blob/main/docs/user_guide.pdf)")
+
+            with c2:
+                st.markdown("#### 🔧 Referencia Tecnica (Markdown)")
+                try:
+                    md_path = os.path.join(BASE_DIR, "docs", "technical_reference.md")
+                    if os.path.exists(md_path):
+                        with open(md_path, "r") as fh:
+                            st.download_button("⬇ Descargar technical_reference.md",
+                                               data=fh.read().encode("utf-8"),
+                                               file_name="SIEG_Atlas_technical_reference.md",
+                                               mime="text/markdown")
+                    else:
+                        st.info("Coloca docs/technical_reference.md en el repo.")
+                except Exception:
+                    st.info("Coloca docs/technical_reference.md en el repo.")
+                st.markdown("[Ver en GitHub →](https://github.com/mcasrom/SIEG-Atlas/blob/main/docs/technical_reference.md)")
+
+            st.divider()
+            st.markdown("[mcasrom.github.io/SIEG-Core →](https://mcasrom.github.io/SIEG-Core/)")
+
+    st.markdown(f"""
+    <div class='sieg-footer'>
+        \U0001f30e S.I.E.G. ATLAS {APP_VERSION} &nbsp;&middot;&nbsp;
+        Infraestructura Critica Global &nbsp;&middot;&nbsp;
+        Scanner V1.3 autolearning + flash<br>
+        &copy; {BUILD_DATE} <b>M. Castillo</b> &nbsp;&middot;&nbsp;
+        <a href='mailto:mybloggingnotes@gmail.com'>mybloggingnotes@gmail.com</a>
+        &nbsp;&middot;&nbsp; Nodo: Odroid-C2 / DietPi
+    </div>
+    """, unsafe_allow_html=True)
+
+
+if __name__ == "__main__":
+    main()
