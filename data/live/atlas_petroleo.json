@@ -2,13 +2,13 @@
   "modulo": "Petroleo",
   "score": 35,
   "alertas": [],
-  "noticias": 110,
-  "timestamp": 1773004502.7816386,
+  "noticias": 95,
+  "timestamp": 1773008102.7366354,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
   "calidad_css": "green",
-  "fuentes_activas": 6,
+  "fuentes_activas": 5,
   "uso_fallback": false,
   "uso_web": false
 }
