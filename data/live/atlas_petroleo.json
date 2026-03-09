@@ -1,9 +1,11 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [],
+  "alertas": [
+    "Asia governments to cap fuel prices as oil costs jump The price of crude has surged above $100 on concerns about shortag"
+  ],
   "noticias": 110,
-  "timestamp": 1773047702.9551263,
+  "timestamp": 1773051302.604599,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
