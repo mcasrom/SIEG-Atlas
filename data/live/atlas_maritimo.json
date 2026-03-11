@@ -1,11 +1,9 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [
-    "Container Shipping Diversions Surge 360% Amid Hormuz Closure The effective closure of the Strait of Hormuz is now rippli"
-  ],
+  "alertas": [],
   "noticias": 102,
-  "timestamp": 1773220502.4599073,
+  "timestamp": 1773224102.4202416,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
