@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "Crude Oil Jumps 4% as Traders Price In Supply Disruption Oil prices rebounded early on Wednesday as the market fears a m"
-  ],
+  "alertas": [],
   "noticias": 112,
-  "timestamp": 1773256502.4485555,
+  "timestamp": 1773260102.69961,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
