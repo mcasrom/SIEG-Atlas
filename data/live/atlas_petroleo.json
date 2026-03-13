@@ -2,11 +2,10 @@
   "modulo": "Petroleo",
   "score": 35,
   "alertas": [
-    "Oil Price Volatility Soars as War Risk Grips the Market Crude oil markets experienced intense volatility between March 8",
-    "Goldman Sachs Hikes Brent Oil Forecast to Over $100 for March Goldman Sachs expects Brent Crude prices to average over $"
+    "Oil Price Volatility Soars as War Risk Grips the Market Crude oil markets experienced intense volatility between March 8"
   ],
   "noticias": 114,
-  "timestamp": 1773422102.3972242,
+  "timestamp": 1773425702.713162,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
