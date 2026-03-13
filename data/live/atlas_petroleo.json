@@ -2,11 +2,12 @@
   "modulo": "Petroleo",
   "score": 35,
   "alertas": [
+    "Goldman Sachs Hikes Brent Oil Forecast to Over $100 for March Goldman Sachs expects Brent Crude prices to average over $",
     "Middle East War Revives Push for Domestic Energy The Middle East war and the mother of all oil shocks—the de facto closu",
     "Trump Weighs Rare Jones Act Waiver as War Drives Fuel Prices Higher The Trump administration is weighing a rare suspensi"
   ],
   "noticias": 113,
-  "timestamp": 1773400502.92238,
+  "timestamp": 1773404102.577635,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
