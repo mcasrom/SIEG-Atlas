@@ -2,10 +2,11 @@
   "modulo": "Petroleo",
   "score": 35,
   "alertas": [
+    "Futures Market Misreads the Hormuz Oil Shock The oil futures paper market is likely underestimating the massive supply d",
     "Trump says ‘many countries’ will send warships to Hormuz amid Iran blockade US president urges naval coalition as Iran s"
   ],
   "noticias": 114,
-  "timestamp": 1773526502.8585687,
+  "timestamp": 1773530102.779932,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
