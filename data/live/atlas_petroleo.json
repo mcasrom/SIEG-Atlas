@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "Oil Price Volatility Soars as War Risk Grips the Market Crude oil markets experienced intense volatility between March 8"
-  ],
+  "alertas": [],
   "noticias": 114,
-  "timestamp": 1773443702.4988089,
+  "timestamp": 1773447302.5141559,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
