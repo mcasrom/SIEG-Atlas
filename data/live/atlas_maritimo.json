@@ -1,9 +1,11 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [],
+  "alertas": [
+    "Trump orders restart of California offshore oil project amid Iran war  The Trump administration has instructed Sable Off"
+  ],
   "noticias": 102,
-  "timestamp": 1773645302.84717,
+  "timestamp": 1773648902.900827,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
