@@ -1,11 +1,9 @@
 {
   "modulo": "Ciber",
   "score": 33,
-  "alertas": [
-    "Hive0163 Uses AI-Assisted Slopoly Malware for Persistent Access in Ransomware Attacks Cybersecurity researchers have dis"
-  ],
+  "alertas": [],
   "noticias": 95,
-  "timestamp": 1773742502.6163683,
+  "timestamp": 1773746102.508506,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
