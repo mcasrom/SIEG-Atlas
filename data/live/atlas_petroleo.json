@@ -1,9 +1,11 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [],
+  "alertas": [
+    "Chinese Oil Giants Return to Russian Crude After U.S. Sanctions Waiver Chinese state oil giants are back scouring the ma"
+  ],
   "noticias": 115,
-  "timestamp": 1773756902.5422006,
+  "timestamp": 1773760502.112976,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
