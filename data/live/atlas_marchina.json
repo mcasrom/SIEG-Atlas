@@ -2,13 +2,13 @@
   "modulo": "MarChina",
   "score": 42,
   "alertas": [],
-  "noticias": 77,
-  "timestamp": 1773807302.0855,
+  "noticias": 87,
+  "timestamp": 1773810902.398359,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
   "calidad_css": "green",
-  "fuentes_activas": 4,
+  "fuentes_activas": 5,
   "uso_fallback": false,
   "uso_web": false
 }
