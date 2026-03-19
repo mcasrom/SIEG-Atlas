@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "Iran Threatens Regional Energy Sites After South Pars Strike Oil and natural gas markets surged after Iran signaled it c"
-  ],
+  "alertas": [],
   "noticias": 115,
-  "timestamp": 1773900902.4525468,
+  "timestamp": 1773904502.5579484,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
