@@ -1,9 +1,12 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [],
+  "alertas": [
+    "Iranian Attack on Qatar LNG Hub Sends European Gas Soaring 35% Europe’s benchmark natural gas prices jumped by 35% at ma",
+    "Brent Jumps 7% to $114 as Spread With WTI Widens to 11-Year High The Brent-WTI spread widened sharply in early trading T"
+  ],
   "noticias": 115,
-  "timestamp": 1773918902.1834028,
+  "timestamp": 1773922502.3589842,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
