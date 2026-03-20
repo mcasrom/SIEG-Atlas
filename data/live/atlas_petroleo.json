@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "Iranian Attack on Qatar LNG Hub Sends European Gas Soaring 35% Europe’s benchmark natural gas prices jumped by 35% at ma"
-  ],
+  "alertas": [],
   "noticias": 115,
-  "timestamp": 1773969302.8437881,
+  "timestamp": 1773972902.4436924,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
