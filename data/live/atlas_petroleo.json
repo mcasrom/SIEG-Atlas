@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "Two Russian Cargoes Offer Temporary Relief for Cuba's Energy Emergency Cuba is set to soon receive two Russian cargoes o"
-  ],
+  "alertas": [],
   "noticias": 115,
-  "timestamp": 1774109702.1044734,
+  "timestamp": 1774113302.5162258,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
