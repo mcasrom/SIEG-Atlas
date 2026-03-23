@@ -1,9 +1,11 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [],
+  "alertas": [
+    "Iran signals possible indefinite Hormuz closure  The fourth week of war between Iran and the US/Israeli coalition reache"
+  ],
   "noticias": 102,
-  "timestamp": 1774253702.5537899,
+  "timestamp": 1774257302.192093,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
