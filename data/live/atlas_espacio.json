@@ -2,13 +2,13 @@
   "modulo": "Espacio",
   "score": 20,
   "alertas": [],
-  "noticias": 70,
-  "timestamp": 1774293302.4531207,
+  "noticias": 90,
+  "timestamp": 1774296902.7412043,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
   "calidad_css": "green",
-  "fuentes_activas": 4,
+  "fuentes_activas": 5,
   "uso_fallback": false,
   "uso_web": false
 }
