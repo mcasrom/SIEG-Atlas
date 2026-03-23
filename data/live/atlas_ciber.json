@@ -1,11 +1,9 @@
 {
   "modulo": "Ciber",
   "score": 33,
-  "alertas": [
-    "CISA Warns of Zimbra, SharePoint Flaw Exploits; Cisco Zero-Day Hit in Ransomware Attacks The U.S. Cybersecurity and Infr"
-  ],
+  "alertas": [],
   "noticias": 95,
-  "timestamp": 1774264502.4371822,
+  "timestamp": 1774268102.0698187,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
