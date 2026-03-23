@@ -2,10 +2,11 @@
   "modulo": "Petroleo",
   "score": 35,
   "alertas": [
+    "High Oil Prices Could Force Fed To Raise Rates The oil-driven inflation shock rippling through global markets is now for",
     "India Holds Fuel Prices Steady Even as Oil Basket Soars Above $155 Indian retail fuel prices are stable despite a surge"
   ],
   "noticias": 115,
-  "timestamp": 1774275302.2085392,
+  "timestamp": 1774278902.3869545,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
