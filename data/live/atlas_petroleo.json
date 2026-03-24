@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "High Oil Prices Could Force Fed To Raise Rates The oil-driven inflation shock rippling through global markets is now for"
-  ],
+  "alertas": [],
   "noticias": 115,
-  "timestamp": 1774314902.8308306,
+  "timestamp": 1774318502.8347347,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
