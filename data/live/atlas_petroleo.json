@@ -1,9 +1,11 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [],
+  "alertas": [
+    "Aid flotilla vessel arrives in Cuba amid US-driven energy crisis Activists say that aid delivery is small &#039;gesture"
+  ],
   "noticias": 115,
-  "timestamp": 1774379702.3202987,
+  "timestamp": 1774383302.7610376,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
