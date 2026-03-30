@@ -2,13 +2,13 @@
   "modulo": "Cables",
   "score": 15,
   "alertas": [],
-  "noticias": 75,
-  "timestamp": 1774890902.9015188,
+  "noticias": 0,
+  "timestamp": 1774894502.9988968,
   "version": "V1.3",
-  "calidad_nivel": "VERDE",
-  "calidad_emoji": "🟢",
-  "calidad_css": "green",
-  "fuentes_activas": 4,
-  "uso_fallback": false,
-  "uso_web": false
+  "calidad_nivel": "ROJO",
+  "calidad_emoji": "🔴",
+  "calidad_css": "red",
+  "fuentes_activas": 0,
+  "uso_fallback": true,
+  "uso_web": true
 }
