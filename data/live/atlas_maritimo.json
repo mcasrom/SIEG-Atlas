@@ -1,9 +1,11 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [],
+  "alertas": [
+    "‘This is a nightmare scenario if it escalates further.’ Elisabeth Kendall says the Houthi attack on Israel demonstrated"
+  ],
   "noticias": 102,
-  "timestamp": 1774858502.7567375,
+  "timestamp": 1774862102.4204822,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",

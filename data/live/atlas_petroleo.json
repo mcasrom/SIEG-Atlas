@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "The Cushion Is Gone and the Oil Market Is Now Exposed The global oil market has been on a rollercoaster since late Febru"
-  ],
+  "alertas": [],
   "noticias": 115,
-  "timestamp": 1774858502.7567375,
+  "timestamp": 1774862102.4204822,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
