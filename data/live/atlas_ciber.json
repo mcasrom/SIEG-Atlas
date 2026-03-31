@@ -1,9 +1,11 @@
 {
   "modulo": "Ciber",
   "score": 33,
-  "alertas": [],
+  "alertas": [
+    "TrueConf Zero-Day Exploited in Attacks on Southeast Asian Government Networks A high-severity security flaw in the TrueC"
+  ],
   "noticias": 95,
-  "timestamp": 1774973702.996632,
+  "timestamp": 1774977302.0403929,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
