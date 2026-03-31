@@ -4,13 +4,13 @@
   "alertas": [
     "Brent Heads for Record Monthly Leap as Houthi Attacks Widen Gulf Conflict Oil prices extended gains on Monday, with Bren"
   ],
-  "noticias": 102,
-  "timestamp": 1774941302.6997156,
+  "noticias": 92,
+  "timestamp": 1774944902.7190144,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
   "calidad_css": "green",
-  "fuentes_activas": 6,
+  "fuentes_activas": 5,
   "uso_fallback": false,
   "uso_web": false
 }
