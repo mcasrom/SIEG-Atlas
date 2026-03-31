@@ -4,13 +4,13 @@
   "alertas": [
     "Three Crises, Four Years: Europe Keeps Failing the Same Energy Test For the third time in four years, Europe is waking u"
   ],
-  "noticias": 115,
-  "timestamp": 1774959302.971013,
+  "noticias": 95,
+  "timestamp": 1774962902.4229755,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
   "calidad_css": "green",
-  "fuentes_activas": 6,
+  "fuentes_activas": 5,
   "uso_fallback": false,
   "uso_web": false
 }
