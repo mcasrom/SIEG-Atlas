@@ -2,10 +2,11 @@
   "modulo": "Ciber",
   "score": 33,
   "alertas": [
-    "TrueConf Zero-Day Exploited in Attacks on Southeast Asian Government Networks A high-severity security flaw in the TrueC"
+    "TrueConf Zero-Day Exploited in Attacks on Southeast Asian Government Networks A high-severity security flaw in the TrueC",
+    "Google fixes fourth Chrome zero-day exploited in attacks in 2026 Google has fixed the fourth Chrome vulnerability exploi"
   ],
   "noticias": 95,
-  "timestamp": 1775038502.6099453,
+  "timestamp": 1775042102.0157838,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
