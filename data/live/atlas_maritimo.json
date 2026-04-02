@@ -2,13 +2,13 @@
   "modulo": "Maritimo",
   "score": 45,
   "alertas": [],
-  "noticias": 102,
-  "timestamp": 1775132102.0585148,
+  "noticias": 92,
+  "timestamp": 1775135702.1402931,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
   "calidad_css": "green",
-  "fuentes_activas": 6,
+  "fuentes_activas": 5,
   "uso_fallback": false,
   "uso_web": false
 }
