@@ -1,11 +1,9 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [
-    "Hormuz closure drives global coal comeback  As another vessel was struck today in the region, Iran&#8217;s effective clo"
-  ],
+  "alertas": [],
   "noticias": 102,
-  "timestamp": 1775114102.4891326,
+  "timestamp": 1775117702.9352818,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
