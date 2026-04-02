@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "Trump Tells U.K. to ‘Fight for Yourself’ as Fuel Crisis Deepens President Donald Trump has told Sir Keir Starmer that th"
-  ],
+  "alertas": [],
   "noticias": 115,
-  "timestamp": 1775135702.1402931,
+  "timestamp": 1775139302.534078,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
