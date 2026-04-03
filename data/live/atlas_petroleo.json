@@ -1,9 +1,11 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [],
+  "alertas": [
+    "Oil Rally Accelerates as Traders Price in Real Supply Disruption May WTI crude oil surged sharply in the holiday-shorten"
+  ],
   "noticias": 115,
-  "timestamp": 1775218503.1769707,
+  "timestamp": 1775222102.2057087,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
