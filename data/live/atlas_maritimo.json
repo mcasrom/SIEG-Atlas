@@ -1,11 +1,9 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [
-    "Trump offers no concrete plan as Strait of Hormuz closure shocks Europe Economist James Meadway says US President Donald"
-  ],
+  "alertas": [],
   "noticias": 102,
-  "timestamp": 1775412902.5464904,
+  "timestamp": 1775416502.108852,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
