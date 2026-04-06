@@ -1,11 +1,9 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [
-    "What Beijing Is Learning From Operation Epic Fury Five weeks into the US-Israel air campaign against Iran, the world is"
-  ],
+  "alertas": [],
   "noticias": 115,
-  "timestamp": 1775484902.207151,
+  "timestamp": 1775488502.8841562,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
