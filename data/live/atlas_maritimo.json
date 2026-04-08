@@ -1,11 +1,9 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [
-    "Trump Threatens to Kill ‘A Whole Civilization’ Over Strait of Hormuz Closure U.S. President Donald Trump threatened that"
-  ],
+  "alertas": [],
   "noticias": 102,
-  "timestamp": 1775664902.8313618,
+  "timestamp": 1775668502.9168928,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
