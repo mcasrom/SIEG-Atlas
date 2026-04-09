@@ -2,10 +2,11 @@
   "modulo": "Petroleo",
   "score": 35,
   "alertas": [
+    "U.S. LNG Exports Soar To Record Levels In March Amid Panic Buying U.S. liquefied natural gas (LNG) exports hit a record",
     "Sanctioned Russian LNG Finds Buyers in Asia at Deep Discounts Russia has offered several cargoes of liquefied natural ga"
   ],
   "noticias": 115,
-  "timestamp": 1775744102.968244,
+  "timestamp": 1775747702.7405179,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
