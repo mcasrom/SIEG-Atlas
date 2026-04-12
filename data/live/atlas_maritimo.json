@@ -1,9 +1,11 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [],
+  "alertas": [
+    "What is a naval blockade and how would it work in Strait of Hormuz? Donald Trump says that the US is going to start bloc"
+  ],
   "noticias": 102,
-  "timestamp": 1776024902.813077,
+  "timestamp": 1776028502.0129824,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
