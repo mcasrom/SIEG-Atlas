@@ -2,11 +2,10 @@
   "modulo": "Petroleo",
   "score": 35,
   "alertas": [
-    "Oil Soars 7%, OPEC Cuts Demand Forecast As Trump Moves to Block Iran Ports Oil prices jumped more than 7% back above $10",
-    "Inpex Boosts Condensate from LNG Project to Bolster Australia's Fuel Supply Inpex, the Japanese energy firm that operate"
+    "Oil Soars 7%, OPEC Cuts Demand Forecast As Trump Moves to Block Iran Ports Oil prices jumped more than 7% back above $10"
   ],
   "noticias": 115,
-  "timestamp": 1776107702.0526345,
+  "timestamp": 1776111302.2411633,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
