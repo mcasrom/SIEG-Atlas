@@ -2,10 +2,11 @@
   "modulo": "Petroleo",
   "score": 35,
   "alertas": [
+    "Time to Plan for Months of Oil, Gas Shortage Global oil production has been slashed by as much as 11 million barrels dai",
     "Oil Soars 7%, OPEC Cuts Demand Forecast As Trump Moves to Block Iran Ports Oil prices jumped more than 7% back above $10"
   ],
   "noticias": 115,
-  "timestamp": 1776114911.7612996,
+  "timestamp": 1776118502.6948283,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",

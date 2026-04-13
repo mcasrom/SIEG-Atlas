@@ -1,11 +1,9 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [
-    "Two Iran-linked Ships Passed Through Strait of Hormuz Ahead of U.S. Blockade The vessels exited the Strait of Hormuz on"
-  ],
+  "alertas": [],
   "noticias": 102,
-  "timestamp": 1776114911.7612996,
+  "timestamp": 1776118502.6948283,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
