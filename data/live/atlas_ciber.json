@@ -1,11 +1,9 @@
 {
   "modulo": "Ciber",
   "score": 33,
-  "alertas": [
-    "Adobe Reader Zero-Day Exploited via Malicious PDFs Since December 2025 Threat actors have been exploiting a previously u"
-  ],
+  "alertas": [],
   "noticias": 95,
-  "timestamp": 1776143702.2887545,
+  "timestamp": 1776147302.7173307,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
