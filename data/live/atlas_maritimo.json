@@ -5,13 +5,13 @@
     "US-Sanctioned Tanker Tests Trump Blockade With Hormuz Exit A US-sanctioned tanker linked to China is sailing out of the",
     "How many ships are crossing the Strait of Hormuz? Four vessels with links to Iran have crossed the Strait of Hormuz desp"
   ],
-  "noticias": 92,
-  "timestamp": 1776190502.2035646,
+  "noticias": 102,
+  "timestamp": 1776194102.1863623,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
   "calidad_css": "green",
-  "fuentes_activas": 5,
+  "fuentes_activas": 6,
   "uso_fallback": false,
   "uso_web": false
 }
