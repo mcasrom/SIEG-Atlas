@@ -1,9 +1,11 @@
 {
   "modulo": "Petroleo",
   "score": 35,
-  "alertas": [],
+  "alertas": [
+    "Trump’s Waiver Of Jones Act Fails To Cool Oil Prices Last month, U.S. President Donald Trump issued a 60-day waiver for"
+  ],
   "noticias": 115,
-  "timestamp": 1776276902.1082573,
+  "timestamp": 1776280502.77734,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
