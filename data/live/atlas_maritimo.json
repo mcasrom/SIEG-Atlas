@@ -1,11 +1,9 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [
-    "US-Sanctioned Tanker Tests Trump Blockade With Hormuz Exit A US-sanctioned tanker linked to China is sailing out of the"
-  ],
+  "alertas": [],
   "noticias": 102,
-  "timestamp": 1776269702.156841,
+  "timestamp": 1776273302.3846319,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
