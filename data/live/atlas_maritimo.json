@@ -1,11 +1,9 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [
-    "Iran threatens wider blockade  Iran escalated its rhetoric on Wednesday, with the commander of its joint military comman"
-  ],
+  "alertas": [],
   "noticias": 102,
-  "timestamp": 1776406510.7102847,
+  "timestamp": 1776410106.851204,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
