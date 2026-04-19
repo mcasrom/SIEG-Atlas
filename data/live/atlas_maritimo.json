@@ -4,13 +4,13 @@
   "alertas": [
     "Iran war live: Tehran says no date set for US talks, Hormuz Strait closed IRGC says the Strait of Hormuz will remain clo"
   ],
-  "noticias": 102,
-  "timestamp": 1776579310.0595107,
+  "noticias": 92,
+  "timestamp": 1776582906.4745755,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
   "calidad_css": "green",
-  "fuentes_activas": 6,
+  "fuentes_activas": 5,
   "uso_fallback": false,
   "uso_web": false
 }
