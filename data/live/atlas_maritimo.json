@@ -1,9 +1,11 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [],
+  "alertas": [
+    "What we know about the Iranian ship seized by the US The US has intercepted an Iranian ship entering the Gulf as part of"
+  ],
   "noticias": 102,
-  "timestamp": 1776712504.6866267,
+  "timestamp": 1776716104.8071496,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
