@@ -1,11 +1,9 @@
 {
   "modulo": "Maritimo",
   "score": 45,
-  "alertas": [
-    "US-Israeli war on Iran will push 30 million back into poverty, UN warns Disruption to fuel and fertiliser supplies due t"
-  ],
+  "alertas": [],
   "noticias": 102,
-  "timestamp": 1776978904.8020854,
+  "timestamp": 1776982504.207433,
   "version": "V1.3",
   "calidad_nivel": "VERDE",
   "calidad_emoji": "🟢",
